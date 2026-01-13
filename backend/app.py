@@ -1,15 +1,14 @@
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from pydantic import BaseModel
 import tempfile
-from fastapi import UploadFile, File
-from backend.validation.service import compare_pdfs
-import tempfile
+import os
 
 from backend.agent.agent import run_agent
 from backend.safety.input_guard import is_query_allowed
 from backend.safety.prompt_guard import is_prompt_safe
-from backend.validation.service import compare_documents
+from backend.compare.service import compare_pdfs
 
-app = FastAPI()
+app = FastAPI(title="Spotline Internal Platform")
 
 
 # -----------------------------
@@ -20,11 +19,14 @@ class AskRequest(BaseModel):
 
 
 # -----------------------------
-# PIPELINE 1: INTERNAL RAG
+# PIPELINE 1: INTERNAL RAG CHAT
 # -----------------------------
 @app.post("/ask")
 def ask(req: AskRequest):
     query = req.query.strip()
+
+    if not query:
+        return {"answer": "Empty query.", "sources": []}
 
     # Rule-based input validation
     if not is_query_allowed(query):
@@ -33,8 +35,13 @@ def ask(req: AskRequest):
             "sources": [],
         }
 
-    # Prompt injection / jailbreak detection
-    if not is_prompt_safe(query):
+    #Prompt injection / jailbreak detection (fail-open)
+    try:
+        safe = is_prompt_safe(query)
+    except Exception:
+        safe = True
+
+    if safe is False:
         return {
             "answer": "Query blocked due to unsafe or malicious intent.",
             "sources": [],
@@ -44,19 +51,40 @@ def ask(req: AskRequest):
 
 
 # -----------------------------
-# PIPELINE 2: DOCX ↔ PDF COMPARISON
+# PIPELINE 2: PDF ↔ PDF VALIDATION
 # -----------------------------
 @app.post("/compare")
-async def compare_documents(
-    input_pdf: UploadFile = File(...),
-    output_pdf: UploadFile = File(...)
+def compare(
+    client_pdf: UploadFile = File(...),
+    output_pdf: UploadFile = File(...),
 ):
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as f1, \
-         tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as f2:
+    client_path = None
+    output_path = None
 
-        f1.write(await input_pdf.read())
-        f2.write(await output_pdf.read())
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as c:
+            c.write(client_pdf.file.read())
+            client_path = c.name
 
-        result = compare_pdfs(f1.name, f2.name)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as o:
+            o.write(output_pdf.file.read())
+            output_path = o.name
 
-    return result
+        diffs = compare_pdfs(client_path, output_path)
+        return {"differences": diffs}
+
+    except Exception as e:
+        # 👇 PRINT FULL ERROR TO CONSOLE
+        import traceback
+        traceback.print_exc()
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e),
+        )
+
+    finally:
+        if client_path and os.path.exists(client_path):
+            os.remove(client_path)
+        if output_path and os.path.exists(output_path):
+            os.remove(output_path)
