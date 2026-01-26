@@ -8,6 +8,35 @@ from backend.compare.schemas import (
 from backend.compare.text_parsers import normalize_text
 
 
+def extract_metadata(first_page) -> dict:
+    """Extract metadata from first page of client PDF"""
+    text = first_page.extract_text()
+    
+    # Extract Script ID
+    script_id_match = re.search(r'Test Script ID\s+([A-Z0-9\-]+)', text)
+    script_id = script_id_match.group(1) if script_id_match else ""
+    
+    # Extract Title
+    title_match = re.search(r'Title\s+(.+?)(?:\n|Description)', text)
+    title = title_match.group(1).strip() if title_match else ""
+    
+    # Extract Description
+    desc_match = re.search(r'Description\s+(.+?)(?:\n|Run Number|Setup Steps)', text, re.DOTALL)
+    description = desc_match.group(1).strip() if desc_match else ""
+    description = re.sub(r'\s+', ' ', description)  # Normalize whitespace
+    
+    # Extract Run Number
+    run_match = re.search(r'Run Number\s+(\d+)', text)
+    run_number = run_match.group(1) if run_match else ""
+    
+    return {
+        "script_id": script_id,
+        "title": title,
+        "description": description,
+        "run_number": run_number
+    }
+
+
 def identify_table_type(table) -> str:
     """
     Identify if table is setup or execution based on headers
@@ -48,7 +77,7 @@ def clean_cell(cell) -> str:
     return text.strip()
 
 
-def parse_setup_table(table) -> list[SetupStep]:
+def parse_setup_table(table) -> list:
     """Parse a setup steps table"""
     steps = []
     
@@ -99,7 +128,7 @@ def parse_setup_table(table) -> list[SetupStep]:
     return steps
 
 
-def parse_execution_table(table) -> list[ClientExecutionStep]:
+def parse_execution_table(table) -> list:
     """Parse an execution steps table"""
     steps = []
     
@@ -159,6 +188,26 @@ def parse_execution_table(table) -> list[ClientExecutionStep]:
     return steps
 
 
+def _deduplicate_setup_steps(steps: list) -> list:
+    """Remove duplicate steps and sort by step number"""
+    seen = {}
+    for step in steps:
+        if step.step_number not in seen:
+            seen[step.step_number] = step
+    
+    return sorted(seen.values(), key=lambda x: x.step_number)
+
+
+def _deduplicate_execution_steps(steps: list) -> list:
+    """Remove duplicate execution steps and sort by step number"""
+    seen = {}
+    for step in steps:
+        if step.step_number not in seen:
+            seen[step.step_number] = step
+    
+    return sorted(seen.values(), key=lambda x: x.step_number)
+
+
 def extract_client_pdf(pdf_path: str) -> ClientScript:
     """
     Extract client (template) test script PDF
@@ -166,8 +215,17 @@ def extract_client_pdf(pdf_path: str) -> ClientScript:
     """
     setup_steps = []
     execution_steps = []
+    metadata = {}
 
     with pdfplumber.open(pdf_path) as pdf:
+        # Extract metadata from first page
+        if pdf.pages:
+            try:
+                metadata = extract_metadata(pdf.pages[0])
+            except Exception as e:
+                print(f"Warning: Could not extract metadata: {e}")
+                metadata = {}
+        
         for page in pdf.pages:
             tables = page.extract_tables()
 
@@ -191,24 +249,4 @@ def extract_client_pdf(pdf_path: str) -> ClientScript:
     setup_steps = _deduplicate_setup_steps(setup_steps)
     execution_steps = _deduplicate_execution_steps(execution_steps)
 
-    return ClientScript(setup_steps, execution_steps)
-
-
-def _deduplicate_setup_steps(steps: list[SetupStep]) -> list[SetupStep]:
-    """Remove duplicate steps and sort by step number"""
-    seen = {}
-    for step in steps:
-        if step.step_number not in seen:
-            seen[step.step_number] = step
-    
-    return sorted(seen.values(), key=lambda x: x.step_number)
-
-
-def _deduplicate_execution_steps(steps: list[ClientExecutionStep]) -> list[ClientExecutionStep]:
-    """Remove duplicate execution steps and sort by step number"""
-    seen = {}
-    for step in steps:
-        if step.step_number not in seen:
-            seen[step.step_number] = step
-    
-    return sorted(seen.values(), key=lambda x: x.step_number)
+    return ClientScript(setup_steps, execution_steps, metadata)

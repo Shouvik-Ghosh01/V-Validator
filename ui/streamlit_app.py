@@ -10,6 +10,23 @@ st.set_page_config(
     layout="wide",
 )
 
+st.markdown(
+    """
+    <style>
+    .light-blue-box {
+        background-color: rgba(33, 150, 243, 0.12); /* soft blue tint */
+        color: #27E0F5; /* dark readable blue text */
+        border-left: 5px solid #2196f3;
+        padding: 0.75rem 1rem;
+        border-radius: 8px;
+        margin-bottom: 0.6rem;
+        font-weight: 600;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 # -------------------------------
 # MODE SELECTOR
 # -------------------------------
@@ -70,7 +87,6 @@ if mode == "🧠 Knowledge Assistant":
 # =====================================================
 else:
     st.subheader("PDF Validation (Client vs V-Assure Output)")
-
     client_pdf = st.file_uploader(
         "Upload Client Test Script (PDF)",
         type=["pdf"],
@@ -94,20 +110,184 @@ else:
                         },
                         timeout=120,
                     )
-
                     if res.status_code != 200:
                         st.error("Comparison failed.")
                     else:
-                        diffs = res.json().get("differences", [])
+                        data = res.json()
 
-                        if not diffs:
-                            st.success("No differences found. Validation passed.")
+                        # Check if we have the new structured format
+                        if "has_differences" in data:
+                            # ═══════════════════════════════════════════════════════
+                            # METADATA SECTION
+                            # ═══════════════════════════════════════════════════════
+                            st.markdown("---")
+                            st.markdown("## 📋 Test Script Information")
+
+                            client_meta = data.get("client_metadata", {})
+                            executed_meta = data.get("executed_metadata", {})
+                            stats = data.get("statistics", {})
+
+                            # Create two columns for client and executed metadata
+                            col1, col2 = st.columns(2)
+
+                            with col1:
+                                st.markdown("### 📄 Client Script")
+                                if client_meta:
+                                    st.markdown(f"**Script ID:** `{client_meta.get('script_id', 'N/A')}`")
+                                    st.markdown(f"**Title:** {client_meta.get('title', 'N/A')}")
+                                    st.markdown(f"**Description:** {client_meta.get('description', 'N/A')}")
+                                    if client_meta.get('run_number'):
+                                        st.markdown(f"**Run Number:** {client_meta.get('run_number')}")
+
+                                # Client statistics
+                                if stats.get("client"):
+                                    client_stats = stats["client"]
+                                    st.markdown("**Step Counts:**")
+                                    st.metric("Total Steps", client_stats.get("total_steps", 0))
+
+                                    metric_col1, metric_col2 = st.columns(2)
+                                    with metric_col1:
+                                        st.metric("Setup", client_stats.get("setup_steps", 0))
+                                    with metric_col2:
+                                        st.metric("Execution", client_stats.get("execution_steps", 0))
+
+                            with col2:
+                                st.markdown("### ✅ Executed Script (V-Assure)")
+                                if executed_meta:
+                                    st.markdown(f"**Script ID:** `{executed_meta.get('script_id', 'N/A')}`")
+                                    st.markdown(f"**Title:** {executed_meta.get('title', 'N/A')}")
+                                    st.markdown(f"**Description:** {executed_meta.get('description', 'N/A')}")
+
+                                    # Execution timing
+                                    if executed_meta.get('start_time'):
+                                        st.markdown(f"**Start Time:** {executed_meta.get('start_time')}")
+                                    if executed_meta.get('end_time'):
+                                        st.markdown(f"**End Time:** {executed_meta.get('end_time')}")
+                                    if executed_meta.get('script_run_time'):
+                                        st.markdown(f"**⏱️ Run Time:** `{executed_meta.get('script_run_time')}`")
+
+                                # Executed statistics
+                                if stats.get("executed"):
+                                    exec_stats = stats["executed"]
+                                    st.markdown("**Step Counts:**")
+                                    st.metric("Total Steps", exec_stats.get("total_steps", 0))
+
+                                    metric_col1, metric_col2 = st.columns(2)
+                                    with metric_col1:
+                                        st.metric("Pre-Test Setup", exec_stats.get("pre_test_setup_steps", 0))
+                                    with metric_col2:
+                                        st.metric("Execution", exec_stats.get("execution_steps", 0))
+
+                            # ═══════════════════════════════════════════════════════
+                            # COMPARISON RESULTS SECTION
+                            # ═══════════════════════════════════════════════════════
+                            st.markdown("---")
+                            st.markdown("## 🔍 Comparison Results")
+
+                            # New structured format
+                            if not data["has_differences"]:
+                                st.success("✅ No differences found. Validation passed!")
+                            else:
+                                summary = data["summary"]
+                                st.error(f"❌ Found {summary['total_issues']} issue(s)")
+
+                                # Display summary metrics
+                                col1, col2, col3 = st.columns(3)
+                                with col1:
+                                    st.metric("Total Issues", summary["total_issues"])
+                                with col2:
+                                    st.metric("Setup Steps", summary["setup_steps_with_issues"])
+                                with col3:
+                                    st.metric("Execution Steps", summary["execution_steps_with_issues"])
+
+                                st.markdown("---")
+
+                                # SETUP DIFFERENCES SECTION
+                                if data["setup_differences"]:
+                                    st.markdown("### 🔧 Setup Steps Differences")
+
+                                    for step_num in sorted(data["setup_differences"].keys()):
+                                        differences = data["setup_differences"][step_num]
+
+                                        with st.expander(f"📍 Setup Step {step_num} - {len(differences)} issue(s)", expanded=True):
+                                            for diff in differences:
+                                                if diff["type"] == "missing":
+                                                    st.error(f"⚠️ {diff['message']}")
+
+                                                elif diff["type"] == "procedure_mismatch":
+                                                    st.markdown(
+                                                        "<div class='light-blue-box'><b>Procedure Mismatch</b></div>",
+                                                        unsafe_allow_html=True,
+                                                    )
+                                                    col1, col2 = st.columns(2)
+                                                    with col1:
+                                                        st.markdown("**Client:**")
+                                                        st.code(diff["client"], language=None)
+                                                    with col2:
+                                                        st.markdown("**Executed:**")
+                                                        st.code(diff["executed"], language=None)
+
+                                # EXECUTION DIFFERENCES SECTION
+                                if data["execution_differences"]:
+                                    st.markdown("### ⚡ Execution Steps Differences")
+
+                                    for step_num in sorted(data["execution_differences"].keys()):
+                                        differences = data["execution_differences"][step_num]
+
+                                        with st.expander(f"📍 Execution Step {step_num} - {len(differences)} issue(s)", expanded=True):
+                                            for diff in differences:
+                                                if diff["type"] == "missing":
+                                                    st.error(f"⚠️ {diff['message']}")
+
+                                                elif diff["type"] == "procedure_mismatch":
+                                                    st.markdown(
+                                                        "<div class='light-blue-box'><b>Procedure Mismatch</b></div>",
+                                                        unsafe_allow_html=True,
+                                                    )
+                                                    col1, col2 = st.columns(2)
+                                                    with col1:
+                                                        st.markdown("**Client Procedure:**")
+                                                        st.code(diff["client"], language=None)
+                                                    with col2:
+                                                        st.markdown("**Executed Procedure:**")
+                                                        st.code(diff["executed"], language=None)
+
+                                                elif diff["type"] == "expected_mismatch":
+                                                    st.warning("**❷ Expected Results Mismatch (Client vs Executed)**")
+                                                    col1, col2 = st.columns(2)
+                                                    with col1:
+                                                        st.markdown("**Client Expected:**")
+                                                        st.code(diff["client"], language=None)
+                                                    with col2:
+                                                        st.markdown("**Executed Expected:**")
+                                                        st.code(diff["executed"], language=None)
+
+                                                elif diff["type"] == "expected_vs_actual":
+                                                    st.error("**❸ Expected vs Actual Mismatch**")
+                                                    col1, col2 = st.columns(2)
+                                                    with col1:
+                                                        st.markdown("**Client Expected:**")
+                                                        st.code(diff["client_expected"], language=None)
+                                                    with col2:
+                                                        st.markdown("**Executed Actual:**")
+                                                        st.code(diff["executed_actual"], language=None)
+
+                                                # Add separator between differences in same step
+                                                st.markdown("---")
+
                         else:
-                            st.error("Differences detected:")
-                            for d in diffs:
-                                st.code(d)
+                            # Fallback for old format (list of strings)
+                            diffs = data.get("differences", [])
+                            if not diffs:
+                                st.success("✅ No differences found. Validation passed!")
+                            else:
+                                st.error(f"❌ Differences detected ({len(diffs)}):")
+                                for d in diffs:
+                                    st.code(d)
 
                 except Timeout:
-                    st.error("Comparison timed out.")
+                    st.error("⏱️ Comparison timed out.")
                 except ConnectionError:
-                    st.error("Backend not running.")
+                    st.error("🔌 Backend not running.")
+                except Exception as e:
+                    st.error(f"❌ Error: {str(e)}")

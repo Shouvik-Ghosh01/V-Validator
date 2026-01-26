@@ -58,32 +58,36 @@ def compare(
     client_pdf: UploadFile = File(...),
     output_pdf: UploadFile = File(...),
 ):
+    """
+    Compare client PDF with executed PDF
+    Returns structured comparison results
+    """
     client_path = None
     output_path = None
-
     try:
+        # Save uploaded files to temp
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as c:
             c.write(client_pdf.file.read())
             client_path = c.name
-
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as o:
             o.write(output_pdf.file.read())
             output_path = o.name
-
-        diffs = compare_pdfs(client_path, output_path)
-        return {"differences": diffs}
-
+        
+        # Compare PDFs - now returns structured data
+        result = compare_pdfs(client_path, output_path)
+        
+        return result
+        
     except Exception as e:
-        # 👇 PRINT FULL ERROR TO CONSOLE
+        # Print full error to console
         import traceback
         traceback.print_exc()
-
         raise HTTPException(
             status_code=500,
             detail=str(e),
         )
-
     finally:
+        # Cleanup temp files
         if client_path and os.path.exists(client_path):
             os.remove(client_path)
         if output_path and os.path.exists(output_path):

@@ -1,5 +1,5 @@
-from dataclasses import dataclass
-from typing import List
+from dataclasses import dataclass, field
+from typing import List, Dict, Any
 
 
 # -----------------------------
@@ -40,6 +40,7 @@ class ExecutedExecutionStep:
 class ClientScript:
     setup_steps: List[SetupStep]
     execution_steps: List[ClientExecutionStep]
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 # -----------------------------
@@ -49,3 +50,4 @@ class ClientScript:
 class ExecutedScript:
     pre_test_setup: List[SetupStep]
     execution_steps: List[ExecutedExecutionStep]
+    metadata: Dict[str, Any] = field(default_factory=dict)

@@ -1,28 +1,35 @@
-from typing import List
+from typing import List, Dict, Any
 from backend.compare.schemas import ClientScript, ExecutedScript
 
 
 def _normalize(text: str) -> str:
-    """Normalize text for safe comparison."""
-    return (text or "").strip().lower()
+    """
+    Normalize text for comparison - EXACT matching with basic cleanup only.
+    Only strips leading/trailing whitespace and converts None to empty string.
+    Does NOT lowercase or normalize internal spaces.
+    """
+    if text is None:
+        return ""
+    return text.strip()
 
 
 def compare_scripts(
     client_script: ClientScript,
     executed_script: ExecutedScript,
-) -> List[str]:
+) -> Dict[str, Any]:
     """
     Compares client (input) PDF vs executed (V-Assure output) PDF.
 
-    Rules:
-    - Setup steps:
-        • Compare step number + procedure text
-    - Execution steps:
-        • Compare expected results
-        • PASS / FAIL must be PASS
+    Rules for each step:
+    1. Compare procedure: Client → Executed (EXACT match)
+    2. Compare expected results: Client → Executed (EXACT match)
+    3. Compare expected results to actual results: Client Expected → Executed Actual (EXACT match)
+    
+    Returns structured comparison results with separate sections for setup and execution steps.
     """
 
-    diffs: List[str] = []
+    setup_differences = {}
+    execution_differences = {}
 
     # -----------------------------
     # SETUP STEP COMPARISON
@@ -33,16 +40,24 @@ def compare_scripts(
     for step_num, client_step in client_setup.items():
         exec_step = executed_setup.get(step_num)
 
-        if not exec_step:
-            diffs.append(f"[SETUP] Step {step_num} missing in executed PDF")
-            continue
+        step_diffs = []
 
-        if _normalize(client_step.procedure) != _normalize(exec_step.procedure):
-            diffs.append(
-                f"[SETUP] Step {step_num} procedure mismatch\n"
-                f"  Client: {client_step.procedure}\n"
-                f"  Executed: {exec_step.procedure}"
-            )
+        if not exec_step:
+            step_diffs.append({
+                "type": "missing",
+                "message": "Step missing in executed PDF"
+            })
+        else:
+            # Compare procedure - EXACT match
+            if _normalize(client_step.procedure) != _normalize(exec_step.procedure):
+                step_diffs.append({
+                    "type": "procedure_mismatch",
+                    "client": client_step.procedure,
+                    "executed": exec_step.procedure
+                })
+
+        if step_diffs:
+            setup_differences[step_num] = step_diffs
 
     # -----------------------------
     # EXECUTION STEP COMPARISON
@@ -53,26 +68,53 @@ def compare_scripts(
     for step_num, client_step in client_exec.items():
         exec_step = executed_exec.get(step_num)
 
+        step_diffs = []
+
         if not exec_step:
-            diffs.append(f"[EXECUTION] Step {step_num} missing in executed PDF")
-            continue
+            step_diffs.append({
+                "type": "missing",
+                "message": "Step missing in executed PDF"
+            })
+        else:
+            # 1️⃣ Compare PROCEDURE: Client → Executed (EXACT match)
+            if _normalize(client_step.procedure) != _normalize(exec_step.procedure):
+                step_diffs.append({
+                    "type": "procedure_mismatch",
+                    "client": client_step.procedure,
+                    "executed": exec_step.procedure
+                })
 
-        # Expected results comparison
-        if _normalize(client_step.expected_results) != _normalize(exec_step.expected_results):
-            diffs.append(
-                f"[EXECUTION] Step {step_num} expected result mismatch\n"
-                f"  Client: {client_step.expected_results}\n"
-                f"  Executed: {exec_step.expected_results}"
-            )
+            # 2️⃣ Compare EXPECTED RESULTS: Client → Executed (EXACT match)
+            if _normalize(client_step.expected_results) != _normalize(exec_step.expected_results):
+                step_diffs.append({
+                    "type": "expected_mismatch",
+                    "client": client_step.expected_results,
+                    "executed": exec_step.expected_results
+                })
 
-        # PASS / FAIL must be PASS
-        pass_fail = _normalize(exec_step.pass_fail)
+            # 3️⃣ Compare CLIENT EXPECTED vs EXECUTED ACTUAL (EXACT match)
+            if _normalize(client_step.expected_results) != _normalize(exec_step.actual_results):
+                step_diffs.append({
+                    "type": "expected_vs_actual",
+                    "client_expected": client_step.expected_results,
+                    "executed_actual": exec_step.actual_results
+                })
 
-        if pass_fail != "pass":
-            diffs.append(
-                f"[EXECUTION] Step {step_num} did not PASS\n"
-                f"  Actual Result: {exec_step.actual_results or 'N/A'}\n"
-                f"  Status: {exec_step.pass_fail or 'MISSING'}"
-            )
+        if step_diffs:
+            execution_differences[step_num] = step_diffs
 
-    return diffs
+    # Calculate summary
+    total_setup_issues = len(setup_differences)
+    total_execution_issues = len(execution_differences)
+    total_issues = total_setup_issues + total_execution_issues
+
+    return {
+        "has_differences": total_issues > 0,
+        "summary": {
+            "total_issues": total_issues,
+            "setup_steps_with_issues": total_setup_issues,
+            "execution_steps_with_issues": total_execution_issues
+        },
+        "setup_differences": setup_differences,
+        "execution_differences": execution_differences
+    }

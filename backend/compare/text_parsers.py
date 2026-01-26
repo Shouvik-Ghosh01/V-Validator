@@ -2,6 +2,7 @@ import re
 
 
 def normalize_text(text: str) -> str:
+    """Normalize text for storage (NOT for comparison)"""
     if not text:
         return ""
     text = text.replace("\n", " ")
@@ -10,6 +11,7 @@ def normalize_text(text: str) -> str:
 
 
 def parse_bullets(text: str) -> list[str]:
+    """Parse bullet points from text"""
     lines = text.splitlines()
     bullets = []
     for line in lines:
@@ -17,7 +19,9 @@ def parse_bullets(text: str) -> list[str]:
             bullets.append(normalize_text(line[1:]))
     return bullets
 
+
 PASS_FAIL_VALUES = {"pass", "fail", "n/a"}
+
 
 def extract_pass_fail(cells: list[str]) -> str:
     """

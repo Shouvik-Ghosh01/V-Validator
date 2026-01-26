@@ -5,16 +5,16 @@ from typing import List, Dict, Any
 import traceback
 
 
-def compare_pdfs(client_pdf_path: str, executed_pdf_path: str) -> List[str]:
+def compare_pdfs(client_pdf_path: str, executed_pdf_path: str) -> Dict[str, Any]:
     """
-    Compare client PDF with executed PDF and return differences
+    Compare client PDF with executed PDF and return structured differences
     
     Args:
         client_pdf_path: Path to client (template) test script PDF
         executed_pdf_path: Path to executed (V-Assure output) test script PDF
     
     Returns:
-        List of difference strings
+        Dictionary with structured comparison results including metadata
     
     Raises:
         Exception: If extraction or comparison fails
@@ -26,10 +26,28 @@ def compare_pdfs(client_pdf_path: str, executed_pdf_path: str) -> List[str]:
         # Extract executed script
         executed_script = extract_executed_pdf(executed_pdf_path)
         
-        # Compare
-        differences = compare_scripts(client_script, executed_script)
+        # Compare - returns structured data
+        comparison_result = compare_scripts(client_script, executed_script)
         
-        return differences
+        # Add metadata from both PDFs
+        comparison_result["client_metadata"] = client_script.metadata
+        comparison_result["executed_metadata"] = executed_script.metadata
+        
+        # Add step counts
+        comparison_result["statistics"] = {
+            "client": {
+                "total_steps": len(client_script.setup_steps) + len(client_script.execution_steps),
+                "setup_steps": len(client_script.setup_steps),
+                "execution_steps": len(client_script.execution_steps),
+            },
+            "executed": {
+                "total_steps": len(executed_script.pre_test_setup) + len(executed_script.execution_steps),
+                "pre_test_setup_steps": len(executed_script.pre_test_setup),
+                "execution_steps": len(executed_script.execution_steps),
+            }
+        }
+        
+        return comparison_result
         
     except Exception as e:
         # Re-raise with more context
@@ -39,68 +57,65 @@ def compare_pdfs(client_pdf_path: str, executed_pdf_path: str) -> List[str]:
         raise Exception(error_msg) from e
 
 
-def compare_pdfs_with_details(
-    client_pdf_path: str, 
-    executed_pdf_path: str
-) -> Dict[str, Any]:
+def compare_pdfs_legacy(client_pdf_path: str, executed_pdf_path: str) -> List[str]:
     """
-    Compare PDFs and return detailed results including statistics
+    Legacy function that returns differences as list of strings
+    For backward compatibility with old API responses
     
     Args:
         client_pdf_path: Path to client test script PDF
         executed_pdf_path: Path to executed test script PDF
     
     Returns:
-        Dictionary with differences, statistics, and metadata
+        List of difference strings
     """
     try:
-        # Extract scripts
-        client_script = extract_client_pdf(client_pdf_path)
-        executed_script = extract_executed_pdf(executed_pdf_path)
+        # Get structured comparison
+        result = compare_pdfs(client_pdf_path, executed_pdf_path)
         
-        # Compare
-        differences = compare_scripts(client_script, executed_script)
+        # Convert to legacy format (list of strings)
+        differences = []
         
-        # Build detailed response
-        result = {
-            "success": True,
-            "differences": differences,
-            "difference_count": len(differences),
-            "statistics": {
-                "client": {
-                    "setup_steps": len(client_script.setup_steps),
-                    "execution_steps": len(client_script.execution_steps),
-                },
-                "executed": {
-                    "pre_test_setup_steps": len(executed_script.pre_test_setup),
-                    "execution_steps": len(executed_script.execution_steps),
-                }
-            },
-            "status": "MATCH" if len(differences) == 0 else "MISMATCH"
-        }
+        # Process setup differences
+        for step_num, step_diffs in result.get("setup_differences", {}).items():
+            for diff in step_diffs:
+                if diff["type"] == "missing":
+                    differences.append(f"[SETUP] Step {step_num} missing in executed PDF")
+                elif diff["type"] == "procedure_mismatch":
+                    differences.append(
+                        f"[SETUP] Step {step_num} procedure mismatch\n"
+                        f"  Client: {diff['client']}\n"
+                        f"  Executed: {diff['executed']}"
+                    )
         
-        # Add failure summary if there are differences
-        if differences:
-            failure_count = sum(1 for d in differences if "did not PASS" in d)
-            mismatch_count = len(differences) - failure_count
-            
-            result["summary"] = {
-                "failed_steps": failure_count,
-                "mismatched_steps": mismatch_count,
-                "total_issues": len(differences)
-            }
+        # Process execution differences
+        for step_num, step_diffs in result.get("execution_differences", {}).items():
+            for diff in step_diffs:
+                if diff["type"] == "missing":
+                    differences.append(f"[EXECUTION] Step {step_num} missing in executed PDF")
+                elif diff["type"] == "procedure_mismatch":
+                    differences.append(
+                        f"[EXECUTION] Step {step_num} procedure mismatch\n"
+                        f"  Client Procedure: {diff['client']}\n"
+                        f"  Executed Procedure: {diff['executed']}"
+                    )
+                elif diff["type"] == "expected_mismatch":
+                    differences.append(
+                        f"[EXECUTION] Step {step_num} expected results mismatch (Client vs Executed)\n"
+                        f"  Client Expected: {diff['client']}\n"
+                        f"  Executed Expected: {diff['executed']}"
+                    )
+                elif diff["type"] == "expected_vs_actual":
+                    differences.append(
+                        f"[EXECUTION] Step {step_num} expected vs actual mismatch\n"
+                        f"  Client Expected: {diff['client_expected']}\n"
+                        f"  Executed Actual: {diff['executed_actual']}"
+                    )
         
-        return result
+        return differences
         
     except Exception as e:
-        return {
-            "success": False,
-            "error": str(e),
-            "error_type": type(e).__name__,
-            "differences": [],
-            "difference_count": 0,
-            "status": "ERROR"
-        }
+        return []
 
 
 def validate_pdf_extraction(pdf_path: str, is_executed: bool = False) -> Dict[str, Any]:
@@ -121,6 +136,7 @@ def validate_pdf_extraction(pdf_path: str, is_executed: bool = False) -> Dict[st
             return {
                 "valid": True,
                 "type": "executed",
+                "metadata": script.metadata,
                 "statistics": {
                     "pre_test_setup_steps": len(script.pre_test_setup),
                     "execution_steps": len(script.execution_steps),
@@ -131,6 +147,7 @@ def validate_pdf_extraction(pdf_path: str, is_executed: bool = False) -> Dict[st
             return {
                 "valid": True,
                 "type": "client",
+                "metadata": script.metadata,
                 "statistics": {
                     "setup_steps": len(script.setup_steps),
                     "execution_steps": len(script.execution_steps),

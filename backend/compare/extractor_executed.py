@@ -1,11 +1,70 @@
 import pdfplumber
 import re
+from datetime import datetime
 from backend.compare.schemas import (
     SetupStep,
     ExecutedExecutionStep,
     ExecutedScript,
 )
 from backend.compare.text_parsers import extract_pass_fail, normalize_text
+
+
+def extract_metadata(page) -> dict:
+    """Extract metadata from second page of executed PDF"""
+    text = page.extract_text()
+    
+    # Extract Script ID
+    script_id_match = re.search(r'Test Script ID\s+([A-Z0-9\-]+)', text)
+    script_id = script_id_match.group(1) if script_id_match else ""
+    
+    # Extract Title
+    title_match = re.search(r'Title\s+(.+?)(?:\n|Description)', text)
+    title = title_match.group(1).strip() if title_match else ""
+    
+    # Extract Description
+    desc_match = re.search(r'Description\s+(.+?)(?:\n|Build Number|Start Time)', text, re.DOTALL)
+    description = desc_match.group(1).strip() if desc_match else ""
+    description = re.sub(r'\s+', ' ', description)
+    
+    # Extract Start Time
+    start_match = re.search(r'Start Time\s+(.+?)(?:\n|End Time)', text)
+    start_time = start_match.group(1).strip() if start_match else ""
+    
+    # Extract End Time
+    end_match = re.search(r'End Time\s+(.+?)(?:\n|Pre-Test)', text)
+    end_time = end_match.group(1).strip() if end_match else ""
+    
+    # Calculate runtime
+    script_run_time = calculate_runtime(start_time, end_time)
+    
+    return {
+        "script_id": script_id,
+        "title": title,
+        "description": description,
+        "start_time": start_time,
+        "end_time": end_time,
+        "script_run_time": script_run_time
+    }
+
+
+def calculate_runtime(start_time: str, end_time: str) -> str:
+    """Calculate the difference between start and end time"""
+    try:
+        # Parse format: "22-OCT-2025 10:38:31 GMT-07:00"
+        start_dt = datetime.strptime(start_time.split(' GMT')[0], "%d-%b-%Y %H:%M:%S")
+        end_dt = datetime.strptime(end_time.split(' GMT')[0], "%d-%b-%Y %H:%M:%S")
+        
+        diff = end_dt - start_dt
+        
+        # Format as HH:MM:SS
+        total_seconds = int(diff.total_seconds())
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        seconds = total_seconds % 60
+        
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+    except Exception as e:
+        return "00:00:00"
 
 
 def identify_table_type(table) -> str:
@@ -34,7 +93,7 @@ def clean_cell(cell) -> str:
     return text.strip()
 
 
-def extract_pre_test_setup(page_text: str) -> list[SetupStep]:
+def extract_pre_test_setup(page_text: str) -> list:
     """Extract Pre-Test Setup steps from text"""
     steps = []
     
@@ -76,7 +135,7 @@ def extract_pre_test_setup(page_text: str) -> list[SetupStep]:
     return steps
 
 
-def parse_execution_table(table) -> list[ExecutedExecutionStep]:
+def parse_execution_table(table) -> list:
     """Parse an execution steps table with actual results"""
     steps = []
     
@@ -157,6 +216,26 @@ def parse_execution_table(table) -> list[ExecutedExecutionStep]:
     return steps
 
 
+def _deduplicate_setup_steps(steps: list) -> list:
+    """Remove duplicate steps and sort by step number"""
+    seen = {}
+    for step in steps:
+        if step.step_number not in seen:
+            seen[step.step_number] = step
+    
+    return sorted(seen.values(), key=lambda x: x.step_number)
+
+
+def _deduplicate_execution_steps(steps: list) -> list:
+    """Remove duplicate execution steps and sort by step number"""
+    seen = {}
+    for step in steps:
+        if step.step_number not in seen:
+            seen[step.step_number] = step
+    
+    return sorted(seen.values(), key=lambda x: x.step_number)
+
+
 def extract_executed_pdf(pdf_path: str) -> ExecutedScript:
     """
     Extract executed (V-Assure) test script PDF.
@@ -166,12 +245,21 @@ def extract_executed_pdf(pdf_path: str) -> ExecutedScript:
     - PASS / FAIL is detected robustly from any column
     """
 
-    pre_test_steps: list[SetupStep] = []
-    execution_steps: list[ExecutedExecutionStep] = []
+    pre_test_steps = []
+    execution_steps = []
+    metadata = {}
 
     with pdfplumber.open(pdf_path) as pdf:
         # Skip first page (cover), start from page 2
         pages_to_process = pdf.pages[1:] if len(pdf.pages) > 1 else pdf.pages
+        
+        # Extract metadata from second page (first page after cover)
+        if pages_to_process:
+            try:
+                metadata = extract_metadata(pages_to_process[0])
+            except Exception as e:
+                print(f"Warning: Could not extract metadata: {e}")
+                metadata = {}
         
         for page in pages_to_process:
             page_text = page.extract_text() or ""
@@ -204,24 +292,5 @@ def extract_executed_pdf(pdf_path: str) -> ExecutedScript:
     return ExecutedScript(
         pre_test_setup=pre_test_steps,
         execution_steps=execution_steps,
+        metadata=metadata
     )
-
-
-def _deduplicate_setup_steps(steps: list[SetupStep]) -> list[SetupStep]:
-    """Remove duplicate steps and sort by step number"""
-    seen = {}
-    for step in steps:
-        if step.step_number not in seen:
-            seen[step.step_number] = step
-    
-    return sorted(seen.values(), key=lambda x: x.step_number)
-
-
-def _deduplicate_execution_steps(steps: list[ExecutedExecutionStep]) -> list[ExecutedExecutionStep]:
-    """Remove duplicate execution steps and sort by step number"""
-    seen = {}
-    for step in steps:
-        if step.step_number not in seen:
-            seen[step.step_number] = step
-    
-    return sorted(seen.values(), key=lambda x: x.step_number)
