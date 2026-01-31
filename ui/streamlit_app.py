@@ -227,53 +227,96 @@ else:
                                                         st.markdown("**Executed:**")
                                                         st.code(diff["executed"], language=None)
 
-                                # EXECUTION DIFFERENCES SECTION
-                                if data["execution_differences"]:
-                                    st.markdown("### ⚡ Execution Steps Differences")
-
-                                    for step_num in sorted(data["execution_differences"].keys()):
-                                        differences = data["execution_differences"][step_num]
-
-                                        with st.expander(f"📍 Execution Step {step_num} - {len(differences)} issue(s)", expanded=True):
-                                            for diff in differences:
-                                                if diff["type"] == "missing":
-                                                    st.error(f"⚠️ {diff['message']}")
-
-                                                elif diff["type"] == "procedure_mismatch":
-                                                    st.markdown(
-                                                        "<div class='light-blue-box'><b>Procedure Mismatch</b></div>",
-                                                        unsafe_allow_html=True,
-                                                    )
-                                                    col1, col2 = st.columns(2)
-                                                    with col1:
-                                                        st.markdown("**Client Procedure:**")
-                                                        st.code(diff["client"], language=None)
-                                                    with col2:
-                                                        st.markdown("**Executed Procedure:**")
-                                                        st.code(diff["executed"], language=None)
-
-                                                elif diff["type"] == "expected_mismatch":
-                                                    st.warning("**❷ Expected Results Mismatch (Client vs Executed)**")
-                                                    col1, col2 = st.columns(2)
-                                                    with col1:
-                                                        st.markdown("**Client Expected:**")
-                                                        st.code(diff["client"], language=None)
-                                                    with col2:
-                                                        st.markdown("**Executed Expected:**")
-                                                        st.code(diff["executed"], language=None)
-
-                                                elif diff["type"] == "expected_vs_actual":
-                                                    st.error("**❸ Expected vs Actual Mismatch**")
-                                                    col1, col2 = st.columns(2)
-                                                    with col1:
-                                                        st.markdown("**Client Expected:**")
-                                                        st.code(diff["client_expected"], language=None)
-                                                    with col2:
-                                                        st.markdown("**Executed Actual:**")
-                                                        st.code(diff["executed_actual"], language=None)
-
-                                                # Add separator between differences in same step
-                                                st.markdown("---")
+                            # EXECUTION DIFFERENCES SECTION
+                            if data["execution_differences"]:
+                                st.markdown("### ⚡ Execution Steps Differences")
+                            
+                                for step_num in sorted(data["execution_differences"].keys()):
+                                    differences = data["execution_differences"][step_num]
+                            
+                                    # ✅ Count only real issues
+                                    real_issues = [
+                                        d for d in differences
+                                        if d["type"] not in ["expected_with_dynamic_data"]
+                                    ]
+                            
+                                    # ✅ Runtime-only validation
+                                    runtime_only = [
+                                        d for d in differences
+                                        if d["type"] == "expected_with_dynamic_data"
+                                    ]
+                            
+                                    # 🚫 Skip completely empty steps
+                                    if not real_issues and not runtime_only:
+                                        continue
+                                    
+                                    # ✅ Title logic
+                                    if real_issues:
+                                        title = f"📍 Execution Step {step_num} - {len(real_issues)} issue(s)"
+                                    else:
+                                        title = f"📍 Execution Step {step_num} - validated with runtime data"
+                            
+                                    with st.expander(title, expanded=True):
+                                    
+                                        # ─────────────────────────────
+                                        # REAL ISSUES FIRST
+                                        # ─────────────────────────────
+                                        for diff in real_issues:
+                                            if diff["type"] == "missing":
+                                                st.error(f"⚠️ {diff['message']}")
+                            
+                                            elif diff["type"] == "procedure_mismatch":
+                                                st.error("❌ Procedure mismatch")
+                                                col1, col2 = st.columns(2)
+                                                with col1:
+                                                    st.markdown("**Client Procedure:**")
+                                                    st.code(diff["client"], language=None)
+                                                with col2:
+                                                    st.markdown("**Executed Procedure:**")
+                                                    st.code(diff["executed"], language=None)
+                            
+                                            elif diff["type"] == "expected_mismatch":
+                                                st.warning("⚠ Expected results mismatch")
+                                                col1, col2 = st.columns(2)
+                                                with col1:
+                                                    st.markdown("**Client Expected:**")
+                                                    st.code(diff["client"], language=None)
+                                                with col2:
+                                                    st.markdown("**Executed Expected:**")
+                                                    st.code(diff["executed"], language=None)
+                            
+                                            elif diff["type"] == "expected_vs_actual":
+                                                st.error("❌ Expected vs Actual mismatch")
+                                                col1, col2 = st.columns(2)
+                                                with col1:
+                                                    st.markdown("**Client Expected:**")
+                                                    st.code(diff["client_expected"], language=None)
+                                                with col2:
+                                                    st.markdown("**Executed Actual:**")
+                                                    st.code(diff["executed_actual"], language=None)
+                            
+                                            st.markdown("---")
+                            
+                                        # ─────────────────────────────
+                                        # RUNTIME-GENERATED VALIDATION
+                                        # ─────────────────────────────
+                                        for diff in runtime_only:
+                                            st.success("✔ Expected result met with runtime-generated data")
+                            
+                                            col1, col2 = st.columns(2)
+                                            with col1:
+                                                st.markdown("**Client Expected:**")
+                                                st.code(diff.get("expected", ""), language=None)
+                                            with col2:
+                                                st.markdown("**Executed Actual:**")
+                                                st.code(diff.get("actual", ""), language=None)
+                            
+                                            dynamic_data = diff.get("dynamic_data", {})
+                                            if dynamic_data:
+                                                st.markdown("**📌 Generated Values:**")
+                                                for key, value in dynamic_data.items():
+                                                    st.code(f"{key}: {value}", language=None)
+                
 
                         else:
                             # Fallback for old format (list of strings)
