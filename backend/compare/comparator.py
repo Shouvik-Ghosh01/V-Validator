@@ -1,5 +1,6 @@
 from typing import Dict, Any, List
 import logging
+import re
 
 from backend.compare.schemas import ClientScript, ExecutedScript
 from backend.compare.dynamic_rules import (
@@ -13,21 +14,71 @@ from backend.compare.dynamic_rules import (
 logger = logging.getLogger("pdf_comparator")
 logger.setLevel(logging.INFO)
 
-# If not already configured elsewhere
 if not logger.handlers:
     handler = logging.StreamHandler()
-    formatter = logging.Formatter(
-        "[%(levelname)s] %(message)s"
-    )
+    formatter = logging.Formatter("[%(levelname)s] %(message)s")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
+
+
+# ------------------------------------------------------------------
+# Logging helper
+# ------------------------------------------------------------------
+def log_block(title: str, content):
+    logger.info("---- %s ----", title)
+    if isinstance(content, dict):
+        for k, v in content.items():
+            logger.info("%s → %s", k, v)
+    elif isinstance(content, list):
+        for v in content:
+            logger.info("- %s", v)
+    else:
+        logger.info("%s", content if content else "<EMPTY>")
+    logger.info("---- END %s ----", title)
+
+
+# =====================================================
+# SETUP STEP 1 – ENSURE ACCOUNT HANDLING
+# =====================================================
+EMAIL_REGEX = r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"
+
+
+def normalize_role_name(text: str) -> str:
+    if not text:
+        return ""
+    text = text.lower()
+    text = re.sub(r"[•\-]", " ", text)
+    text = text.replace("/", " ")
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
+
+
+def extract_roles_from_client(text: str) -> List[str]:
+    roles = []
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith("-"):
+            roles.append(normalize_role_name(line))
+    return roles
+
+
+def extract_roles_and_emails_from_exec(text: str) -> Dict[str, str]:
+    result = {}
+    lines = [l.strip() for l in text.splitlines() if l.strip()]
+    for line in lines:
+        email_match = re.search(EMAIL_REGEX, line)
+        if email_match:
+            email = email_match.group(0)
+            role_part = line.split(":")[0]
+            role = normalize_role_name(role_part)
+            result[role] = email
+    return result
 
 
 # ------------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------------
 def _normalize(text: str) -> str:
-    """Normalize text for safe comparison."""
     return (text or "").strip()
 
 
@@ -38,33 +89,11 @@ def compare_scripts(
     client_script: ClientScript,
     executed_script: ExecutedScript,
 ) -> Dict[str, Any]:
-    """
-    Compares client (input) PDF vs executed (V-Assure output) PDF.
-
-    EXECUTION RULES:
-    1. Procedure must match exactly
-    2. Expected results must match exactly OR
-       Expected must be a PREFIX of Actual when dynamic data is allowed
-    3. PASS/FAIL:
-        - PASS  -> OK
-        - FAIL  -> ISSUE
-        - MISSING / None -> IGNORE (NOT an issue)
-    """
 
     setup_differences: Dict[int, List[Dict[str, Any]]] = {}
     execution_differences: Dict[int, List[Dict[str, Any]]] = {}
 
     logger.info("Starting PDF comparison")
-    logger.info(
-        "Client steps: setup=%d, execution=%d",
-        len(client_script.setup_steps),
-        len(client_script.execution_steps),
-    )
-    logger.info(
-        "Executed steps: setup=%d, execution=%d",
-        len(executed_script.pre_test_setup),
-        len(executed_script.execution_steps),
-    )
 
     # =====================================================
     # SETUP STEP COMPARISON
@@ -76,26 +105,77 @@ def compare_scripts(
         exec_step = executed_setup.get(step_num)
         diffs = []
 
+        logger.info("[SETUP %s] Comparing setup step", step_num)
+
         if not exec_step:
+            logger.warning("[SETUP %s] Missing in executed PDF", step_num)
             diffs.append({
                 "type": "missing",
                 "message": "Step missing in executed PDF",
             })
-            logger.warning("[SETUP %s] Missing in executed PDF", step_num)
 
+        # -------------------------------------------------
+        # STEP 1 – ENSURE THE FOLLOWING
+        # -------------------------------------------------
+        elif (
+            step_num == 1
+            and client_step.procedure.lower().startswith("ensure the following")
+        ):
+            logger.info("[SETUP 1] Detected ENSURE THE FOLLOWING step")
+
+            log_block("SETUP 1 CLIENT RAW", client_step.procedure)
+            log_block("SETUP 1 EXEC RAW", exec_step.procedure)
+
+            client_roles = extract_roles_from_client(client_step.procedure)
+            exec_roles_emails = extract_roles_and_emails_from_exec(exec_step.procedure)
+
+            log_block("SETUP 1 CLIENT ROLES", client_roles)
+            log_block("SETUP 1 EXEC ROLES → EMAILS", exec_roles_emails)
+
+            missing_roles = [
+                role for role in client_roles
+                if role not in exec_roles_emails
+            ]
+
+            if missing_roles:
+                logger.warning("[SETUP 1] Missing roles detected")
+                log_block("SETUP 1 MISSING ROLES", missing_roles)
+
+                diffs.append({
+                    "type": "ensure_account_missing",
+                    "missing_roles": missing_roles,
+                    "client": client_step.procedure,
+                    "executed": exec_step.procedure,
+                })
+            else:
+                logger.info("[SETUP 1] Accounts validated with runtime emails")
+
+                diffs.append({
+                    "type": "ensure_accounts_with_dynamic_data",
+                    "status": "PASS",
+                    "accounts": exec_roles_emails,
+                })
+
+        # -------------------------------------------------
+        # NORMAL SETUP STEPS
+        # -------------------------------------------------
         else:
-            if _normalize(client_step.procedure) != _normalize(exec_step.procedure):
+            client_norm = _normalize(client_step.procedure)
+            exec_norm = _normalize(exec_step.procedure)
+
+            if client_norm != exec_norm:
+                logger.warning("[SETUP %s] Procedure mismatch", step_num)
+
+                log_block(f"SETUP {step_num} CLIENT RAW", client_step.procedure)
+                log_block(f"SETUP {step_num} EXEC RAW", exec_step.procedure)
+                log_block(f"SETUP {step_num} CLIENT NORMALIZED", client_norm)
+                log_block(f"SETUP {step_num} EXEC NORMALIZED", exec_norm)
+
                 diffs.append({
                     "type": "procedure_mismatch",
                     "client": client_step.procedure,
                     "executed": exec_step.procedure,
                 })
-                logger.warning(
-                    "[SETUP %s] Procedure mismatch\nClient: %r\nExecuted: %r",
-                    step_num,
-                    client_step.procedure,
-                    exec_step.procedure,
-                )
 
         if diffs:
             setup_differences[step_num] = diffs
@@ -110,37 +190,37 @@ def compare_scripts(
         exec_step = executed_exec.get(step_num)
         diffs = []
 
-        logger.info(
-            "[EXEC %s] Starting comparison | pass_fail=%r",
-            step_num,
-            getattr(exec_step, "pass_fail", None),
-        )
+        logger.info("[EXEC %s] Comparing execution step", step_num)
 
         if not exec_step:
+            logger.warning("[EXEC %s] Missing in executed PDF", step_num)
             diffs.append({
                 "type": "missing",
                 "message": "Step missing in executed PDF",
             })
-            logger.warning("[EXEC %s] Missing in executed PDF", step_num)
 
         else:
-            expected = _normalize(client_step.expected_results)
-            actual = _normalize(exec_step.actual_results)
-
-            # 1️⃣ PROCEDURE
             if _normalize(client_step.procedure) != _normalize(exec_step.procedure):
+                logger.warning("[EXEC %s] Procedure mismatch", step_num)
+
+                log_block(f"EXEC {step_num} CLIENT PROC", client_step.procedure)
+                log_block(f"EXEC {step_num} EXEC PROC", exec_step.procedure)
+
                 diffs.append({
                     "type": "procedure_mismatch",
                     "client": client_step.procedure,
                     "executed": exec_step.procedure,
                 })
-                logger.warning("[EXEC %s] Procedure mismatch", step_num)
 
-            # 2️⃣ EXPECTED vs ACTUAL
+            expected = _normalize(client_step.expected_results)
+            actual = _normalize(exec_step.actual_results)
+
             if expected == actual:
-                logger.info("[EXEC %s] Expected == Actual (exact match)", step_num)
+                logger.info("[EXEC %s] Expected == Actual", step_num)
 
             elif allows_dynamic_suffix(expected) and actual.startswith(expected):
+                logger.info("[EXEC %s] Dynamic suffix accepted", step_num)
+
                 diffs.append({
                     "type": "expected_with_dynamic_data",
                     "status": "PASS",
@@ -148,92 +228,67 @@ def compare_scripts(
                     "actual": actual,
                     "dynamic_data": extract_dynamic_values(actual),
                 })
-                logger.info(
-                    "[EXEC %s] Expected matched with dynamic data | actual=%r",
-                    step_num,
-                    actual,
-                )
 
             else:
+                logger.error("[EXEC %s] Expected vs Actual mismatch", step_num)
+
+                log_block(f"EXEC {step_num} EXPECTED", expected)
+                log_block(f"EXEC {step_num} ACTUAL", actual)
+
                 diffs.append({
                     "type": "expected_vs_actual_mismatch",
                     "client_expected": expected,
                     "executed_actual": actual,
                 })
-                logger.error(
-                    "[EXEC %s] Expected vs Actual mismatch\nExpected: %r\nActual: %r",
-                    step_num,
-                    expected,
-                    actual,
-                )
 
-            # 3️⃣ PASS / FAIL (IMPORTANT FIX)
-            # ❗ Only FAIL is a real issue
-            if exec_step.pass_fail:
-                if exec_step.pass_fail.upper() == "FAIL":
-                    diffs.append({
-                        "type": "execution_failed",
-                        "status": "FAIL",
-                    })
-                    logger.error("[EXEC %s] Execution FAILED", step_num)
-                else:
-                    logger.info(
-                        "[EXEC %s] Execution status=%s (ignored)",
-                        step_num,
-                        exec_step.pass_fail,
-                    )
-            else:
-                logger.info(
-                    "[EXEC %s] Execution status MISSING → ignored (NOT a failure)",
-                    step_num,
-                )
+            if exec_step.pass_fail and exec_step.pass_fail.upper() == "FAIL":
+                logger.error("[EXEC %s] Execution FAILED", step_num)
+                diffs.append({
+                    "type": "execution_failed",
+                    "status": "FAIL",
+                })
 
         if diffs:
             execution_differences[step_num] = diffs
 
     # =====================================================
-    # ISSUE COUNTING (STEP LEVEL — CORRECT)
+    # ISSUE COUNTING
     # =====================================================
     REAL_FAILURE_TYPES = {
         "missing",
         "procedure_mismatch",
         "expected_vs_actual_mismatch",
         "execution_failed",
+        "ensure_account_missing",
     }
 
-    def count_steps_with_real_issues(
-        differences: Dict[int, List[Dict[str, Any]]]
-    ) -> int:
-        """
-        Count steps that have AT LEAST ONE real failure.
-        """
+    def count_real_steps(differences):
         count = 0
         for step_num, step_diffs in differences.items():
-            if any(d["type"] in REAL_FAILURE_TYPES for d in step_diffs):
+            real = [d["type"] for d in step_diffs if d["type"] in REAL_FAILURE_TYPES]
+            if real:
+                logger.info("[COUNT] Step %s counted | reasons=%s", step_num, real)
                 count += 1
-                logger.info(
-                    "[COUNT] Step %s counted as REAL ISSUE", step_num
-                )
+            else:
+                logger.info("[COUNT] Step %s ignored (no real failures)", step_num)
         return count
 
-    total_setup_issues = count_steps_with_real_issues(setup_differences)
-    total_execution_issues = count_steps_with_real_issues(execution_differences)
-    total_issues = total_setup_issues + total_execution_issues
+    total_setup = count_real_steps(setup_differences)
+    total_exec = count_real_steps(execution_differences)
 
-    logger.info("Comparison finished")
     logger.info(
-        "Issue summary → setup=%d, execution=%d, total=%d",
-        total_setup_issues,
-        total_execution_issues,
-        total_issues,
+        "Finished comparison | setup=%d execution=%d total=%d",
+        total_setup,
+        total_exec,
+        total_setup + total_exec,
     )
 
     return {
-        "has_differences": total_issues > 0,
+        "has_differences": (total_setup + total_exec) > 0,
         "summary": {
-            "total_issues": total_issues,
-            "setup_steps_with_issues": total_setup_issues,
-            "execution_steps_with_issues": total_execution_issues,
+            "total_issues": total_setup + total_exec,
+            "setup_steps_with_issues": total_setup,
+            "execution_steps_with_issues": total_exec,
         },
         "setup_differences": setup_differences,
         "execution_differences": execution_differences,

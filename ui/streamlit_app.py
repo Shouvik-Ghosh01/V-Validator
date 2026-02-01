@@ -202,31 +202,44 @@ else:
 
                                 st.markdown("---")
 
-                                # SETUP DIFFERENCES SECTION
-                                if data["setup_differences"]:
-                                    st.markdown("### 🔧 Setup Steps Differences")
 
-                                    for step_num in sorted(data["setup_differences"].keys()):
-                                        differences = data["setup_differences"][step_num]
+                            # =====================================================
+                            # SETUP STEPS (ONLY STEP 1 AUGMENTED)
+                            # =====================================================
+                            if data.get("setup_differences"):
+                                st.markdown("### 🔧 Setup Steps Differences")
 
-                                        with st.expander(f"📍 Setup Step {step_num} - {len(differences)} issue(s)", expanded=True):
-                                            for diff in differences:
-                                                if diff["type"] == "missing":
-                                                    st.error(f"⚠️ {diff['message']}")
+                                for step_num in sorted(data["setup_differences"].keys()):
+                                    diffs = data["setup_differences"][step_num]
 
-                                                elif diff["type"] == "procedure_mismatch":
-                                                    st.markdown(
-                                                        "<div class='light-blue-box'><b>Procedure Mismatch</b></div>",
-                                                        unsafe_allow_html=True,
-                                                    )
-                                                    col1, col2 = st.columns(2)
-                                                    with col1:
-                                                        st.markdown("**Client:**")
-                                                        st.code(diff["client"], language=None)
-                                                    with col2:
-                                                        st.markdown("**Executed:**")
-                                                        st.code(diff["executed"], language=None)
+                                    with st.expander(f"📍 Setup Step {step_num}", expanded=True):
+                                    
+                                        # ✅ NEW: Setup Step 1 runtime account display
+                                        for d in diffs:
+                                            if d.get("type") == "ensure_accounts_with_dynamic_data":
+                                                st.success("✔ Account validated with runtime-generated data")
 
+                                                accounts = d.get("accounts", {})
+                                                for role, email in accounts.items():
+                                                    st.code(f"{role} → {email}")
+
+                                        # ⛔ Existing setup issues (unchanged)
+                                        for d in diffs:
+                                            if d["type"] == "missing":
+                                                st.error(d["message"])
+
+                                            elif d["type"] == "procedure_mismatch":
+                                                st.markdown(
+                                                    "<div class='light-blue-box'><b>Procedure Mismatch</b></div>",
+                                                    unsafe_allow_html=True,
+                                                )
+                                                col1, col2 = st.columns(2)
+                                                with col1:
+                                                    st.code(d["client"], language=None)
+                                                with col2:
+                                                    st.code(d["executed"], language=None)
+
+                                
                             # EXECUTION DIFFERENCES SECTION
                             if data["execution_differences"]:
                                 st.markdown("### ⚡ Execution Steps Differences")
@@ -285,7 +298,7 @@ else:
                                                     st.markdown("**Executed Expected:**")
                                                     st.code(diff["executed"], language=None)
                             
-                                            elif diff["type"] == "expected_vs_actual":
+                                            elif diff["type"] == "expected_vs_actual_mismatch":
                                                 st.error("❌ Expected vs Actual mismatch")
                                                 col1, col2 = st.columns(2)
                                                 with col1:
@@ -334,3 +347,7 @@ else:
                     st.error("🔌 Backend not running.")
                 except Exception as e:
                     st.error(f"❌ Error: {str(e)}")
+                
+
+
+
