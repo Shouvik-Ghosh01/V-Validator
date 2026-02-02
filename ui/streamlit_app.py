@@ -209,7 +209,7 @@ else:
                             if data.get("setup_differences"):
                                 st.markdown("### 🔧 Setup Steps Differences")
 
-                                for step_num in sorted(data["setup_differences"].keys()):
+                                for step_num in sorted(data["setup_differences"].keys(), key=int):
                                     diffs = data["setup_differences"][step_num]
 
                                     with st.expander(f"📍 Setup Step {step_num}", expanded=True):
@@ -244,7 +244,7 @@ else:
                             if data["execution_differences"]:
                                 st.markdown("### ⚡ Execution Steps Differences")
                             
-                                for step_num in sorted(data["execution_differences"].keys()):
+                                for step_num in sorted(data["execution_differences"].keys(), key=int):
                                     differences = data["execution_differences"][step_num]
                             
                                     # ✅ Count only real issues
