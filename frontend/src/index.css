@@ -1,0 +1,139 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@layer base {
+  :root {
+    /* Dark enterprise palette */
+    --background: 222 20% 8%;
+    --foreground: 210 30% 92%;
+
+    --card: 222 18% 11%;
+    --card-foreground: 210 30% 92%;
+
+    --popover: 222 18% 11%;
+    --popover-foreground: 210 30% 92%;
+
+    --primary: 199 89% 48%;
+    --primary-foreground: 222 20% 8%;
+
+    --secondary: 222 15% 16%;
+    --secondary-foreground: 210 25% 75%;
+
+    --muted: 222 15% 14%;
+    --muted-foreground: 215 15% 55%;
+
+    --accent: 199 60% 25%;
+    --accent-foreground: 199 89% 70%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 98%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 222 20% 8%;
+
+    --border: 222 15% 18%;
+    --input: 222 15% 16%;
+    --ring: 199 89% 48%;
+
+    --radius: 0.5rem;
+
+    /* Custom tokens */
+    --surface-1: 222 18% 11%;
+    --surface-2: 222 15% 14%;
+    --surface-3: 222 15% 18%;
+
+    --code-bg: 222 20% 7%;
+    --code-border: 222 15% 22%;
+
+    --diff-red-bg: 0 60% 18%;
+    --diff-red-border: 0 72% 40%;
+    --diff-green-bg: 142 50% 14%;
+    --diff-green-border: 142 60% 35%;
+    --diff-blue-bg: 199 60% 15%;
+    --diff-blue-border: 199 89% 40%;
+    --diff-yellow-bg: 38 70% 14%;
+    --diff-yellow-border: 38 80% 40%;
+
+    --sidebar-background: 222 20% 6%;
+    --sidebar-foreground: 210 25% 75%;
+    --sidebar-primary: 199 89% 48%;
+    --sidebar-primary-foreground: 222 20% 8%;
+    --sidebar-accent: 222 15% 14%;
+    --sidebar-accent-foreground: 210 30% 92%;
+    --sidebar-border: 222 15% 14%;
+    --sidebar-ring: 199 89% 48%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
+  }
+
+  code, pre, .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+@layer utilities {
+  .glass-card {
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+  }
+
+  .diff-red {
+    background: hsl(var(--diff-red-bg));
+    border-left: 3px solid hsl(var(--diff-red-border));
+  }
+
+  .diff-green {
+    background: hsl(var(--diff-green-bg));
+    border-left: 3px solid hsl(var(--diff-green-border));
+  }
+
+  .diff-blue {
+    background: hsl(var(--diff-blue-bg));
+    border-left: 3px solid hsl(var(--diff-blue-border));
+  }
+
+  .diff-yellow {
+    background: hsl(var(--diff-yellow-bg));
+    border-left: 3px solid hsl(var(--diff-yellow-border));
+  }
+
+  .code-block {
+    background: hsl(var(--code-bg));
+    border: 1px solid hsl(var(--code-border));
+    border-radius: calc(var(--radius) - 2px);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    line-height: 1.6;
+    padding: 0.75rem 1rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: hsl(210 25% 80%);
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 4px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: hsl(var(--background));
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 2px;
+  }
+}
