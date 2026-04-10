@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight, MapPin } from "lucide-react";
 import type { ExecutionDifference } from "@/types/comparison";
+import { DiffText } from "@/components/DiffText";
 
 interface ExecutionStepCardProps {
   stepNum: string;
@@ -22,11 +23,15 @@ function CodeComparison({
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
       <div className="space-y-1.5">
         <p className="text-xs font-semibold text-muted-foreground">{leftLabel}</p>
-        <pre className="code-block">{leftText}</pre>
+        <pre className="code-block">
+          <DiffText expected={leftText} actual={rightText} side="left" />
+        </pre>
       </div>
       <div className="space-y-1.5">
         <p className="text-xs font-semibold text-muted-foreground">{rightLabel}</p>
-        <pre className="code-block">{rightText}</pre>
+        <pre className="code-block">
+          <DiffText expected={leftText} actual={rightText} side="right" />
+        </pre>
       </div>
     </div>
   );

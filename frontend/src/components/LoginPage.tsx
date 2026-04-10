@@ -1,123 +1,211 @@
-import { useState } from "react";
-import { Eye, EyeOff, Lock, User, Shield } from "lucide-react";
+/**
+ * Login.tsx
+ * V-Assure styled login — username + password only, no captcha.
+ * Uses the orange/white theme matching the V-Assure interface.
+ *
+ * Usage:
+ *   import Login from "@/components/Login";
+ *   <Login onLogin={(user, pass) => { ... }} />
+ */
 
-interface LoginPageProps {
-  onLogin: () => void;
+import { useState, useRef } from "react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
+
+interface LoginProps {
+  onLogin: (username: string, password: string) => Promise<void> | void;
+  error?: string | null;
+  loading?: boolean;
 }
 
-const CAPTCHA_QUESTION = { a: 7, b: 4, answer: 11 };
+// V-Assure "V" logomark in SVG
+function VAssureLogo() {
+  return (
+    <svg width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* Orange circle background */}
+      <circle cx="26" cy="26" r="26" fill="#F5A623" />
+      {/* White V shape */}
+      <path
+        d="M13 14 L26 38 L39 14"
+        stroke="white"
+        strokeWidth="5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      {/* Inner grey triangle */}
+      <path
+        d="M19 14 L26 28 L33 14"
+        stroke="rgba(255,255,255,0.35)"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </svg>
+  );
+}
 
-export default function LoginPage({ onLogin }: LoginPageProps) {
+export default function Login({ onLogin, error: externalError, loading: externalLoading }: LoginProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [captcha, setCaptcha] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [showPass, setShowPass] = useState(false);
+  const [internalLoading, setInternalLoading] = useState(false);
+  const [internalError, setInternalError] = useState<string | null>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const loading = externalLoading ?? internalLoading;
+  const error = externalError ?? internalError;
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
-
-    if (!username || !password || !captcha) {
-      setError("All fields are required.");
+    if (!username.trim() || !password.trim()) {
+      setInternalError("Please enter your username and password.");
       return;
     }
-    if (parseInt(captcha) !== CAPTCHA_QUESTION.answer) {
-      setError("Incorrect CAPTCHA answer.");
-      return;
+    setInternalError(null);
+    setInternalLoading(true);
+    try {
+      await onLogin(username.trim(), password);
+    } catch (err: any) {
+      setInternalError(err?.message || "Login failed. Please check your credentials.");
+    } finally {
+      setInternalLoading(false);
     }
+  };
 
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      onLogin();
-    }, 800);
+  const inputStyle: React.CSSProperties = {
+    width: "100%",
+    padding: "11px 14px",
+    borderRadius: 8,
+    border: "1px solid hsl(var(--border))",
+    background: "hsl(var(--card))",
+    color: "hsl(var(--foreground))",
+    fontSize: 14,
+    outline: "none",
+    transition: "border-color 0.15s, box-shadow 0.15s",
+    fontFamily: "inherit",
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      {/* Background grid */}
-      <div
-        className="fixed inset-0 opacity-[0.03]"
-        style={{
-          backgroundImage:
-            "linear-gradient(hsl(var(--primary)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--primary)) 1px, transparent 1px)",
-          backgroundSize: "40px 40px",
-        }}
-      />
+    <div style={{
+      minHeight: "100vh",
+      background: "hsl(var(--background))",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: "1.5rem",
+    }}>
+      {/* Card */}
+      <div style={{
+        width: "100%",
+        maxWidth: 400,
+        background: "hsl(var(--card))",
+        border: "1px solid hsl(var(--border))",
+        borderRadius: 14,
+        boxShadow: "0 4px 24px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04)",
+        overflow: "hidden",
+      }}>
+        {/* Orange top bar */}
+        <div style={{
+          height: 5,
+          background: "linear-gradient(90deg, #F5A623 0%, #e8950f 100%)",
+        }} />
 
-      <div className="relative w-full max-w-md">
-        {/* Logo / Brand */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/10 border border-primary/30 mb-4">
-            <Shield className="w-7 h-7 text-primary" />
+        <div style={{ padding: "2.5rem 2rem 2rem" }}>
+          {/* Logo + title */}
+          <div style={{ textAlign: "center", marginBottom: "2rem" }}>
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: "1rem" }}>
+              <VAssureLogo />
+            </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginBottom: 4 }}>
+              <span style={{ fontSize: 22, fontWeight: 700, color: "hsl(var(--foreground))", letterSpacing: "-0.01em" }}>
+                V-Assure
+              </span>
+              <span style={{
+                fontSize: 11, fontWeight: 600, padding: "1px 7px", borderRadius: 20,
+                background: "rgba(245,166,35,0.12)", color: "#F5A623",
+                border: "1px solid rgba(245,166,35,0.3)", letterSpacing: "0.04em",
+              }}>
+                Internal Tool
+              </span>
+            </div>
+            <p style={{ fontSize: 13, color: "hsl(var(--muted-foreground))", margin: 0 }}>
+              Validation & Comparison Platform
+            </p>
           </div>
-          <h1 className="text-2xl font-bold text-foreground">Spotline Internal Platform</h1>
-          <p className="text-muted-foreground text-sm mt-1">Sign in to access your workspace</p>
-        </div>
 
-        {/* Card */}
-        <div className="glass-card p-8 shadow-2xl">
-          <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Form */}
+          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
             {/* Username */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">Username</label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Enter your username"
-                  className="w-full bg-input border border-border rounded-md pl-10 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
-                />
-              </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "hsl(var(--foreground))" }}>
+                Username
+              </label>
+              <input
+                type="text"
+                autoComplete="username"
+                autoFocus
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && passwordRef.current?.focus()}
+                placeholder="Enter your username"
+                style={inputStyle}
+                onFocus={(e) => {
+                  e.target.style.borderColor = "#F5A623";
+                  e.target.style.boxShadow = "0 0 0 3px rgba(245,166,35,0.12)";
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = "hsl(var(--border))";
+                  e.target.style.boxShadow = "none";
+                }}
+              />
             </div>
 
             {/* Password */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">Password</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "hsl(var(--foreground))" }}>
+                Password
+              </label>
+              <div style={{ position: "relative" }}>
                 <input
-                  type={showPassword ? "text" : "password"}
+                  ref={passwordRef}
+                  type={showPass ? "text" : "password"}
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
-                  className="w-full bg-input border border-border rounded-md pl-10 pr-10 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
+                  style={{ ...inputStyle, paddingRight: 44 }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = "#F5A623";
+                    e.target.style.boxShadow = "0 0 0 3px rgba(245,166,35,0.12)";
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = "hsl(var(--border))";
+                    e.target.style.boxShadow = "none";
+                  }}
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={() => setShowPass((v) => !v)}
+                  style={{
+                    position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)",
+                    background: "none", border: "none", cursor: "pointer", padding: 2,
+                    color: "hsl(var(--muted-foreground))", display: "flex", alignItems: "center",
+                  }}
+                  tabIndex={-1}
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
             </div>
 
-            {/* CAPTCHA */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">CAPTCHA Verification</label>
-              <div className="bg-muted border border-border rounded-md px-4 py-3 flex items-center justify-between mb-2">
-                <span className="font-mono text-lg text-foreground font-semibold tracking-widest select-none">
-                  {CAPTCHA_QUESTION.a} + {CAPTCHA_QUESTION.b} = ?
-                </span>
-                <Shield className="w-5 h-5 text-primary" />
-              </div>
-              <input
-                type="number"
-                value={captcha}
-                onChange={(e) => setCaptcha(e.target.value)}
-                placeholder="Enter the answer"
-                className="w-full bg-input border border-border rounded-md px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
-              />
-            </div>
-
             {/* Error */}
             {error && (
-              <div className="diff-red rounded-md px-4 py-2.5 text-sm text-red-300">
+              <div style={{
+                fontSize: 12, padding: "9px 12px", borderRadius: 7,
+                background: "rgba(239,68,68,0.07)", color: "#ef4444",
+                border: "1px solid rgba(239,68,68,0.2)",
+              }}>
                 {error}
               </div>
             )}
@@ -126,13 +214,22 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-primary text-primary-foreground font-semibold rounded-md py-2.5 text-sm hover:bg-primary/90 active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              style={{
+                marginTop: 4,
+                width: "100%", padding: "11px",
+                borderRadius: 8, border: "none",
+                background: loading ? "rgba(245,166,35,0.5)" : "#F5A623",
+                color: "#fff", fontSize: 14, fontWeight: 700,
+                cursor: loading ? "not-allowed" : "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                transition: "background 0.15s",
+                fontFamily: "inherit",
+              }}
+              onMouseEnter={(e) => { if (!loading) (e.currentTarget.style.background = "#e8950f"); }}
+              onMouseLeave={(e) => { if (!loading) (e.currentTarget.style.background = "#F5A623"); }}
             >
               {loading ? (
-                <>
-                  <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-                  Authenticating...
-                </>
+                <><Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> Signing in…</>
               ) : (
                 "Sign In"
               )}
@@ -140,10 +237,23 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           </form>
         </div>
 
-        <p className="text-center text-xs text-muted-foreground mt-6">
-          Spotline Internal Platform · Confidential
-        </p>
+        {/* Footer */}
+        <div style={{
+          padding: "12px 2rem",
+          borderTop: "1px solid hsl(var(--border))",
+          textAlign: "center",
+          fontSize: 11,
+          color: "hsl(var(--muted-foreground))",
+          background: "hsl(var(--muted))",
+        }}>
+          Copyright © Spotline Inc. · V-Assure Internal Platform
+        </div>
       </div>
+
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        input::placeholder { color: hsl(var(--muted-foreground)); opacity: 0.7; }
+      `}</style>
     </div>
   );
 }

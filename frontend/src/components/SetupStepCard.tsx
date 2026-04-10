@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight, MapPin } from "lucide-react";
 import type { SetupDifference } from "@/types/comparison";
+import { DiffText } from "@/components/DiffText";
 
 interface SetupStepCardProps {
   stepNum: string;
@@ -12,11 +13,15 @@ function CodeComparison({ clientText, executedText }: { clientText: string; exec
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
       <div className="space-y-1.5">
         <p className="text-xs font-semibold text-muted-foreground">Client Procedure</p>
-        <pre className="code-block">{clientText}</pre>
+        <pre className="code-block">
+          <DiffText expected={clientText} actual={executedText} side="left" />
+        </pre>
       </div>
       <div className="space-y-1.5">
         <p className="text-xs font-semibold text-muted-foreground">Executed Procedure</p>
-        <pre className="code-block">{executedText}</pre>
+        <pre className="code-block">
+          <DiffText expected={clientText} actual={executedText} side="right" />
+        </pre>
       </div>
     </div>
   );
