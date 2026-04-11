@@ -322,7 +322,7 @@ function ScreenshotCard({ entry }: { entry: ScreenshotEntry }) {
         <div style={{ display: "flex" }}>
           {/* Screenshot image */}
           <div style={{ flex: "0 0 65%", padding: "14px 16px", borderRight: "1px solid hsl(var(--border))", background: "#0d0d0d", display: "flex", alignItems: "flex-start" }}>
-            <img src={entry.imageUrl} alt={stepLabel} style={{ width: "100%", display: "block", borderRadius: 4, imageRendering: "high-quality" }} />
+            <img src={entry.imageUrl} alt={stepLabel} style={{ width: "100%", display: "block", borderRadius: 4, imageRendering: "auto" }} />
           </div>
 
           {/* Step info panel */}
