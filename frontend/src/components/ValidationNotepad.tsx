@@ -8,7 +8,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import {
   ClipboardPaste, Upload, Trash2,
-  Copy, FileText, Plus, X, Check, Image, Minimize2, ChevronDown, ChevronUp,
+  Copy, FileText, Plus, X, Check, Image as ImageIcon, Minimize2, ChevronDown, ChevronUp,
 } from "lucide-react";
 
 type NoteTag = "text_incorrect" | "screenshot_incorrect" | "step_incorrect" | "other";
@@ -77,21 +77,59 @@ function noteToText(n: NoteEntry, idx: number) {
 }
 
 async function copyNoteToClipboard(text: string, imageDataUrl: string | null) {
-  // Try to write both text + image using ClipboardItem (Chrome/Edge only)
   if (imageDataUrl && typeof ClipboardItem !== "undefined") {
     try {
-      const imgBlob = dataUrlToBlob(imageDataUrl); // ← no fetch(), uses atob()
+      const img = new window.Image();
+      await new Promise<void>((res, rej) => {
+        img.onload = () => res();
+        img.onerror = rej;
+        img.src = imageDataUrl;
+      });
+
+      const canvas = document.createElement("canvas");
+      const padding = 16;
+      const lineHeight = 20;
+      const fontSize = 13;
+      const lines = text.split("\n").filter(Boolean);
+      const textBlockHeight = lines.length * lineHeight + padding * 2;
+
+      // Canvas = image on top + text block below
+      canvas.width = Math.max(img.width, 500);
+      canvas.height = img.height + textBlockHeight;
+
+      const ctx = canvas.getContext("2d")!;
+
+      // Draw image
+      ctx.fillStyle = "#000000";
+      ctx.fillRect(0, 0, canvas.width, img.height);
+      ctx.drawImage(img, 0, 0, img.width, img.height);
+
+      // Draw text block background
+      ctx.fillStyle = "#1e1e1e";
+      ctx.fillRect(0, img.height, canvas.width, textBlockHeight);
+
+      // Draw text lines
+      ctx.fillStyle = "#ffffff";
+      ctx.font = `${fontSize}px monospace`;
+      lines.forEach((line, i) => {
+        ctx.fillText(line, padding, img.height + padding + (i + 1) * lineHeight);
+      });
+
+      const pngBlob = await new Promise<Blob>((res, rej) =>
+        canvas.toBlob(b => b ? res(b) : rej("toBlob failed"), "image/png")
+      );
+
       await navigator.clipboard.write([
-        new ClipboardItem({
-          "text/plain": new Blob([text], { type: "text/plain" }),
-          [imgBlob.type]: imgBlob,
-        }),
+        new ClipboardItem({ "image/png": pngBlob }),
       ]);
+
       return;
-    } catch {
-      // ClipboardItem with image not supported — fall through to text only
+    } catch (e) {
+      console.warn("Image+text copy failed, falling back to text:", e);
     }
   }
+
+  // Fallback — text only
   await navigator.clipboard.writeText(text);
 }
 
@@ -105,11 +143,15 @@ function NoteCard({ note, index, onChange, onDelete }: {
   const [collapsed, setCollapsed] = useState(false);
   const [copied, setCopied] = useState(false);
   const tag = TAG_META[note.tag];
-
   const handleCopy = async () => {
-    await copyNoteToClipboard(noteToText(note, index), note.imageDataUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1800);
+    try {
+      await copyNoteToClipboard(noteToText(note, index), note.imageDataUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch (e) {
+      console.error("Copy failed:", e);
+      alert("Clipboard access denied. Check browser permissions.");
+    }
   };
 
   return (
@@ -125,7 +167,7 @@ function NoteCard({ note, index, onChange, onDelete }: {
         <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 7px", borderRadius: 20, background: tag.bg, color: tag.color, border: `1px solid ${tag.border}`, flexShrink: 0 }}>
           {tag.label}
         </span>
-        {note.imageDataUrl && <Image size={11} style={{ color: "hsl(var(--muted-foreground))", flexShrink: 0 }} />}
+        {note.imageDataUrl && <ImageIcon size={11} style={{ color: "hsl(var(--muted-foreground))", flexShrink: 0 }} />}
         <span style={{ fontSize: 11, color: "hsl(var(--muted-foreground))", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {note.stepRef ? `${note.stepRef} · ` : ""}{note.comment?.slice(0, 40) || "No comment"}
         </span>
@@ -251,6 +293,8 @@ export default function ValidationNotepad({ scriptId = "Validation" }: { scriptI
       }
     } catch {
       /* Permission denied or no image — fall through */
+      alert("Clipboard access denied. Use Ctrl+V instead.");
+      return;
     }
     // Add empty text note as fallback
     setNotes(p => [...p, { id: uid(), imageDataUrl: null, comment: "", tag: "text_incorrect", stepRef: "", timestamp: new Date().toLocaleTimeString() }]);
