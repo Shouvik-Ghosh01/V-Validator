@@ -1,4 +1,5 @@
-from backend.compare.extractor_client import extract_client_pdf
+# from backend.compare.extractor_client import extract_client_pdf
+from backend.compare.extractor_client_basics import extract_client_pdf
 from backend.compare.extractor_executed import extract_executed_pdf
 from backend.compare.comparator import compare_scripts
 from typing import List, Dict, Any
