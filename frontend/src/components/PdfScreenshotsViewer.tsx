@@ -36,6 +36,21 @@ interface ScreenshotEntry {
   hasDiff: boolean;
 }
 
+// ─── Backend step data types ─────────────────────────────────────────────────
+
+interface ExecutedStep {
+  step_number: number;
+  procedure: string;
+  expected_results: string;
+  actual_results: string;
+  pass_fail: string;
+}
+
+interface PtsStep {
+  step_number: number;
+  procedure: string;
+}
+
 // ─── Text extraction helpers ──────────────────────────────────────────────────
 
 interface TItem { x: number; y: number; text: string; }
@@ -92,74 +107,10 @@ function detectScreenshot(
   return null;
 }
 
-// ─── Content extractors ───────────────────────────────────────────────────────
-
-function extractPtsText(rows: TItem[][], _stepNum: number): string {
-  const dataRows: TItem[][] = [];
-  let inData = false;
-  for (const row of rows) {
-    const t = row.map(i => i.text).join(" ");
-    if (PTS_RE.test(t) || /screenshot\s+time/i.test(t)) { inData = true; continue; }
-    if (/veeva systems confidential|page \d+ of \d+|script id/i.test(t)) break;
-    if (inData && t.trim()) dataRows.push(row);
-  }
-  return rowsToLines(dataRows);
-}
-
-function extractExecutionStepData(rows: TItem[][]): {
-  procedure: string;
-  expectedResults: string;
-  actualResults: string;
-} {
-  let procMinX = -1, procMaxX = -1;
-  let expMinX  = -1, expMaxX  = -1;
-  let actMinX  = -1;
-  let headerRowIdx = -1;
-
-  for (let i = 0; i < rows.length; i++) {
-    const t = rows[i].map(r => r.text).join(" ").toLowerCase();
-    if (t.includes("procedure") && t.includes("expected")) {
-      headerRowIdx = i;
-      const sorted = [...rows[i]].sort((a, b) => a.x - b.x);
-      for (const item of sorted) {
-        const lc = item.text.toLowerCase().trim();
-        if (lc.includes("procedure") && procMinX === -1) procMinX = item.x;
-        if (lc.includes("expected")  && expMinX  === -1) expMinX  = item.x;
-        if (lc.includes("actual")    && actMinX  === -1) actMinX  = item.x;
-      }
-      procMaxX = expMinX > -1 ? expMinX - 2 : 9999;
-      expMaxX  = actMinX > -1 ? actMinX - 2 : 9999;
-      break;
-    }
-  }
-
-  if (headerRowIdx === -1 || procMinX === -1) {
-    return { procedure: "", expectedResults: "", actualResults: "" };
-  }
-
-  const proc: string[] = [];
-  const exp:  string[] = [];
-  const act:  string[] = [];
-
-  for (let i = headerRowIdx + 1; i < rows.length; i++) {
-    const rowText = rows[i].map(r => r.text).join(" ");
-    if (/veeva systems confidential|page \d+ of \d+|script id/i.test(rowText)) break;
-    for (const item of rows[i]) {
-      const t = item.text.trim();
-      if (!t) continue;
-      if (/^(pass|fail|n\/a|yes|no|pass \/ fail|actual results?)$/i.test(t)) continue;
-      if (item.x >= procMinX && item.x < procMaxX)          proc.push(t);
-      else if (item.x >= expMinX && item.x < expMaxX)       exp.push(t);
-      else if (actMinX > -1 && item.x >= actMinX)           act.push(t);
-    }
-  }
-
-  return {
-    procedure:       proc.join(" ").replace(/\s+/g, " ").trim(),
-    expectedResults: exp.join(" ").replace(/\s+/g, " ").trim(),
-    actualResults:   act.join(" ").replace(/\s+/g, " ").trim(),
-  };
-}
+// ─── Content extractors removed ───────────────────────────────────────────────
+// Procedure, expected results, actual results, and PTS instructions are now
+// supplied directly from the backend (extractor_executed.py) via props,
+// so no client-side PDF re-parsing is needed here.
 
 // ─── Page renderer ────────────────────────────────────────────────────────────
 
@@ -206,22 +157,13 @@ async function extractScreenshots(
       const timeMatch    = TIME_RE.exec(flat);
       const screenshotTime = timeMatch ? timeMatch[1].trim() : null;
       const imageUrl     = await renderPageHQ(page);
-      const rows         = groupRows(items);
 
-      let ptsText: string | null = null;
-      let procedure: string | null = null;
-      let expectedResults: string | null = null;
-      let actualResults: string | null = null;
-
-      if (detected.type === "pts") {
-        const raw = extractPtsText(rows, detected.stepNum);
-        ptsText = raw || null;
-      } else {
-        const data = extractExecutionStepData(rows);
-        procedure       = data.procedure       || null;
-        expectedResults = data.expectedResults || null;
-        actualResults   = data.actualResults   || null;
-      }
+      // Step content comes from backend props — set nulls here,
+      // the popup will look them up from executedSteps / ptsSteps.
+      const ptsText: string | null        = null;
+      const procedure: string | null      = null;
+      const expectedResults: string | null = null;
+      const actualResults: string | null  = null;
 
       const hasDiff =
         detected.type === "execution"
@@ -255,12 +197,14 @@ interface PopupProps {
   entry: ScreenshotEntry;
   /** ref to the button that triggered the popup */
   btnRef: React.RefObject<HTMLButtonElement>;
-  /** ref to the card container (position:relative) */
-  cardRef: React.RefObject<HTMLDivElement>;
+  /** From backend: executed step data (execution steps) */
+  executedStep?: ExecutedStep;
+  /** From backend: pts step data */
+  ptsStep?: PtsStep;
   onClose: () => void;
 }
 
-function StepDetailPopup({ entry, btnRef, cardRef, onClose }: PopupProps) {
+function StepDetailPopup({ entry, btnRef, executedStep, ptsStep, onClose }: PopupProps) {
   const popupRef = useRef<HTMLDivElement>(null);
   const isPts    = entry.type === "pts";
 
@@ -289,41 +233,36 @@ function StepDetailPopup({ entry, btnRef, cardRef, onClose }: PopupProps) {
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  // ── Position: right-align to button, open upward from button so it always
-  //    sits right next to the trigger. Coordinates are relative to the card
-  //    (position:relative) so no scroll offset needed.
-  const POPUP_W = 340;
-  const GAP     = 8;
+  // ── Position: fixed to the viewport so the popup is always anchored
+  //    exactly to the button and never bleeds into other cards or sections.
+  const POPUP_W   = 340;
+  const POPUP_MAX_H = 480;
+  const GAP       = 8;
 
-  let top  = 0;
-  let right = 12; // default: flush with card's right padding
+  let fixedTop  = 0;
+  let fixedLeft = 0;
 
-  if (btnRef.current && cardRef.current) {
-    const btnR  = btnRef.current.getBoundingClientRect();
-    const cardR = cardRef.current.getBoundingClientRect();
+  if (btnRef.current) {
+    const btnR = btnRef.current.getBoundingClientRect();
 
-    // Button's bottom edge relative to card top
-    const btnBottomInCard = btnR.bottom - cardR.top;
-    // Button's top edge relative to card top
-    const btnTopInCard    = btnR.top    - cardR.top;
+    // Horizontal: right-align popup to button's right edge, clamp to viewport
+    fixedLeft = Math.min(
+      btnR.right - POPUP_W,
+      window.innerWidth - POPUP_W - 8
+    );
+    if (fixedLeft < 8) fixedLeft = 8;
 
-    // Popup height is dynamic; open downward first, flip upward if it would
-    // overflow the viewport bottom.
+    // Vertical: open downward by default, flip upward if not enough space below
     const spaceBelow = window.innerHeight - btnR.bottom;
     const spaceAbove = btnR.top;
-    const POPUP_MAX_H = 500; // matches maxHeight in the body
 
     if (spaceBelow >= POPUP_MAX_H || spaceBelow >= spaceAbove) {
-      // Open downward from the button's bottom
-      top = btnBottomInCard + GAP;
+      fixedTop = btnR.bottom + GAP;
     } else {
-      // Open upward — position so popup bottom aligns with button top
-      top = btnTopInCard - POPUP_MAX_H - GAP;
+      // Open upward — bottom of popup aligns with top of button
+      fixedTop = btnR.top - POPUP_MAX_H - GAP;
+      if (fixedTop < 8) fixedTop = 8;
     }
-
-    // Horizontal: right-align popup to button's right edge within the card
-    const btnRightInCard = cardR.right - btnR.right;
-    right = btnRightInCard;
   }
 
   // ── Reusable labelled field ──
@@ -370,9 +309,9 @@ function StepDetailPopup({ entry, btnRef, cardRef, onClose }: PopupProps) {
     <div
       ref={popupRef}
       style={{
-        position: "absolute",
-        top,
-        right,
+        position: "fixed",
+        top: fixedTop,
+        left: fixedLeft,
         width: POPUP_W,
         zIndex: 9999,
         background: "hsl(var(--card))",
@@ -467,17 +406,61 @@ function StepDetailPopup({ entry, btnRef, cardRef, onClose }: PopupProps) {
           </div>
         )}
 
-        {/* PTS */}
+        {/* PTS — sourced from backend ptsStep */}
         {isPts && (
-          <Field label="Setup Instructions" value={entry.ptsText} mono />
+          <Field
+            label="Setup Instructions"
+            value={ptsStep?.procedure ?? null}
+            mono
+          />
         )}
 
-        {/* Execution */}
+        {/* Execution — sourced from backend executedStep */}
         {!isPts && (
           <>
-            <Field label="Procedure"        value={entry.procedure}       />
-            <Field label="Expected Results" value={entry.expectedResults} />
-            <Field label="Actual Results"   value={entry.actualResults}   />
+            <Field label="Procedure"        value={executedStep?.procedure       ?? null} />
+            <Field label="Expected Results" value={executedStep?.expected_results ?? null} />
+            <Field label="Actual Results"   value={executedStep?.actual_results   ?? null} />
+
+            {/* Pass / Fail status badge */}
+            {executedStep?.pass_fail && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.08em",
+                  color: "hsl(var(--muted-foreground))",
+                }}>
+                  Result
+                </span>
+                <span style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  padding: "3px 12px",
+                  borderRadius: 20,
+                  background: executedStep.pass_fail.toUpperCase() === "PASS"
+                    ? "rgba(34,197,94,0.12)"
+                    : executedStep.pass_fail.toUpperCase() === "FAIL"
+                      ? "rgba(239,68,68,0.12)"
+                      : "rgba(148,163,184,0.12)",
+                  color: executedStep.pass_fail.toUpperCase() === "PASS"
+                    ? "#22c55e"
+                    : executedStep.pass_fail.toUpperCase() === "FAIL"
+                      ? "#ef4444"
+                      : "hsl(var(--muted-foreground))",
+                  border: `1px solid ${
+                    executedStep.pass_fail.toUpperCase() === "PASS"
+                      ? "rgba(34,197,94,0.3)"
+                      : executedStep.pass_fail.toUpperCase() === "FAIL"
+                        ? "rgba(239,68,68,0.3)"
+                        : "rgba(148,163,184,0.2)"
+                  }`,
+                }}>
+                  {executedStep.pass_fail}
+                </span>
+              </div>
+            )}
           </>
         )}
 
@@ -502,11 +485,18 @@ function StepDetailPopup({ entry, btnRef, cardRef, onClose }: PopupProps) {
 
 // ─── Screenshot card ──────────────────────────────────────────────────────────
 
-function ScreenshotCard({ entry }: { entry: ScreenshotEntry }) {
+function ScreenshotCard({
+  entry,
+  executedStep,
+  ptsStep,
+}: {
+  entry: ScreenshotEntry;
+  executedStep?: ExecutedStep;
+  ptsStep?: PtsStep;
+}) {
   const [expanded,  setExpanded]  = useState(true);
   const [popupOpen, setPopupOpen] = useState(false);
-  const btnRef  = useRef<HTMLButtonElement>(null);
-  const cardRef = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
 
   const isPts = entry.type === "pts";
   const accentText   = isPts ? "#F5A623" : "#22c55e";
@@ -524,7 +514,7 @@ function ScreenshotCard({ entry }: { entry: ScreenshotEntry }) {
 
   return (
     // overflow: visible so the absolute-positioned popup can escape the card
-    <div ref={cardRef} style={{
+    <div style={{
       position: "relative",
       border: "1px solid hsl(var(--border))",
       borderRadius: 10,
@@ -669,7 +659,8 @@ function ScreenshotCard({ entry }: { entry: ScreenshotEntry }) {
         <StepDetailPopup
           entry={entry}
           btnRef={btnRef}
-          cardRef={cardRef}
+          executedStep={executedStep}
+          ptsStep={ptsStep}
           onClose={() => setPopupOpen(false)}
         />
       )}
@@ -683,9 +674,13 @@ interface Props {
   clientPdf: File;
   outputPdf: File;
   result: ComparisonResult | null;
+  /** Keyed by step_number string — from backend executed_steps */
+  executedSteps?: Record<string, ExecutedStep>;
+  /** Keyed by step_number string — from backend pts_steps */
+  ptsSteps?: Record<string, PtsStep>;
 }
 
-export default function PdfScreenshotsViewer({ clientPdf, outputPdf, result }: Props) {
+export default function PdfScreenshotsViewer({ clientPdf, outputPdf, result, executedSteps = {}, ptsSteps = {} }: Props) {
   const [entries,  setEntries]  = useState<ScreenshotEntry[]>([]);
   const [loading,  setLoading]  = useState(true);
   const [progress, setProgress] = useState({ n: 0, total: 0 });
@@ -807,6 +802,8 @@ export default function PdfScreenshotsViewer({ clientPdf, outputPdf, result }: P
             <ScreenshotCard
               key={`${entry.type}-${entry.stepNum}-${entry.screenshotNum}-${i}`}
               entry={entry}
+              executedStep={executedSteps[String(entry.stepNum)]}
+              ptsStep={ptsSteps[String(entry.stepNum)]}
             />
           ))
         )}
