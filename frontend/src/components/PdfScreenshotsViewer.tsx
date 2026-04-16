@@ -27,9 +27,7 @@ interface ScreenshotEntry {
   pageIndex: number;
   imageUrl: string;
   screenshotTime: string | null;
-  /** PTS: full multi-line setup text with preserved line breaks */
   ptsText: string | null;
-  /** Execution only */
   procedure: string | null;
   expectedResults: string | null;
   actualResults: string | null;
@@ -107,11 +105,6 @@ function detectScreenshot(
   return null;
 }
 
-// ─── Content extractors removed ───────────────────────────────────────────────
-// Procedure, expected results, actual results, and PTS instructions are now
-// supplied directly from the backend (extractor_executed.py) via props,
-// so no client-side PDF re-parsing is needed here.
-
 // ─── Page renderer ────────────────────────────────────────────────────────────
 
 async function renderPageHQ(page: PDFPageProxy): Promise<string> {
@@ -157,9 +150,6 @@ async function extractScreenshots(
       const timeMatch    = TIME_RE.exec(flat);
       const screenshotTime = timeMatch ? timeMatch[1].trim() : null;
       const imageUrl     = await renderPageHQ(page);
-
-      // Step content comes from backend props — set nulls here,
-      // the popup will look them up from executedSteps / ptsSteps.
       const ptsText: string | null        = null;
       const procedure: string | null      = null;
       const expectedResults: string | null = null;
@@ -195,11 +185,8 @@ async function extractScreenshots(
 
 interface PopupProps {
   entry: ScreenshotEntry;
-  /** ref to the button that triggered the popup */
   btnRef: React.RefObject<HTMLButtonElement>;
-  /** From backend: executed step data (execution steps) */
   executedStep?: ExecutedStep;
-  /** From backend: pts step data */
   ptsStep?: PtsStep;
   onClose: () => void;
 }
@@ -212,7 +199,6 @@ function StepDetailPopup({ entry, btnRef, executedStep, ptsStep, onClose }: Popu
     ? { text: "#F5A623", bg: "rgba(245,166,35,0.12)", border: "rgba(245,166,35,0.35)" }
     : { text: "#22c55e", bg: "rgba(34,197,94,0.12)",  border: "rgba(34,197,94,0.35)"  };
 
-  // Close on outside click (delayed so the opening click doesn't immediately close)
   useEffect(() => {
     function onMouseDown(e: MouseEvent) {
       if (
@@ -233,8 +219,6 @@ function StepDetailPopup({ entry, btnRef, executedStep, ptsStep, onClose }: Popu
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  // ── Position: fixed to the viewport so the popup is always anchored
-  //    exactly to the button and never bleeds into other cards or sections.
   const POPUP_W   = 340;
   const POPUP_MAX_H = 480;
   const GAP       = 8;
@@ -245,21 +229,18 @@ function StepDetailPopup({ entry, btnRef, executedStep, ptsStep, onClose }: Popu
   if (btnRef.current) {
     const btnR = btnRef.current.getBoundingClientRect();
 
-    // Horizontal: right-align popup to button's right edge, clamp to viewport
     fixedLeft = Math.min(
       btnR.right - POPUP_W,
       window.innerWidth - POPUP_W - 8
     );
     if (fixedLeft < 8) fixedLeft = 8;
 
-    // Vertical: open downward by default, flip upward if not enough space below
     const spaceBelow = window.innerHeight - btnR.bottom;
     const spaceAbove = btnR.top;
 
     if (spaceBelow >= POPUP_MAX_H || spaceBelow >= spaceAbove) {
       fixedTop = btnR.bottom + GAP;
     } else {
-      // Open upward — bottom of popup aligns with top of button
       fixedTop = btnR.top - POPUP_MAX_H - GAP;
       if (fixedTop < 8) fixedTop = 8;
     }

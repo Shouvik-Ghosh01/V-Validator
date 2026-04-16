@@ -108,11 +108,7 @@ function escHtml(s: string) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-/**
- * Write text/html + text/plain simultaneously to the clipboard.
- * Rich targets (Notion, Word, Gmail, Outlook) get the HTML with embedded images.
- * Plain-text targets (terminal, plain editors) get the fallback text.
- */
+
 async function writeRichClipboard(html: string, plain: string) {
   if (typeof ClipboardItem === "undefined") {
     // Old browser — text-only fallback
