@@ -804,7 +804,7 @@ export default function ValidationNotepad({ scriptId = "Validation" }: { scriptI
             {notes.length > 0 && (
               <button onClick={copyAll} style={{ ...actionBtn, marginLeft: "auto", border: `1px solid ${allCopied ? "#22c55e" : "#F5A623"}`, background: allCopied ? "rgba(34,197,94,0.08)" : "rgba(245,166,35,0.1)", color: allCopied ? "#22c55e" : "#F5A623", fontWeight: 600 }}>
                 {allCopied ? <Check size={12} /> : <Copy size={12} />}
-                {allCopied ? "Copied!" : "Copy all as image"}
+                {allCopied ? "Copied!" : "Copy All"}
               </button>
             )}
           </div>

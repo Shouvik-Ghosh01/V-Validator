@@ -159,9 +159,11 @@ export default function PdfValidationPanel() {
               <TabsContent value="screenshots">
                 <div className="glass-card overflow-hidden">
                   <PdfScreenshotsViewer
-                    clientPdf={clientPdf!}
-                    outputPdf={outputPdf!}
+                    clientPdf={clientPdf}
+                    outputPdf={outputPdf}
                     result={result}
+                    executedSteps={result?.executed_steps ?? {}}
+                    ptsSteps={result?.pts_steps ?? {}}
                   />
                 </div>
               </TabsContent>
