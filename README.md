@@ -114,6 +114,8 @@ The system is designed to ensure that all responses are grounded strictly in app
 ```bash
 python -m venv venv
 venv\Scripts\activate   # Windows
+OR
+source venv/bin/activate   #mac
 ```
 
 ### 2. Install dependencies
@@ -156,7 +158,9 @@ uvicorn backend.app:app --reload
 ### 6. Start frontend
 
 ```bash
-streamlit run ui/streamlit_app.py
+cd frontend
+npm i
+npm run dev
 ```
 
 ---
@@ -164,7 +168,7 @@ streamlit run ui/streamlit_app.py
 ## ☁️ Deployment
 
 * **Backend**: Render (FastAPI)
-* **Frontend**: Streamlit Cloud
+* **Frontend**: NextJs Application
 * **Secrets**: Managed via environment variables (never committed)
 
 ---
