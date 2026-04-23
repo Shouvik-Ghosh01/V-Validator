@@ -10,6 +10,7 @@
 
 import { useState, useRef } from "react";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { VAssureLogo } from "./VAssureLogo";
 
 interface LoginProps {
   onLogin: (username: string, password: string) => Promise<void> | void;
@@ -18,32 +19,32 @@ interface LoginProps {
 }
 
 // V-Assure "V" logomark in SVG
-function VAssureLogo() {
-  return (
-    <svg width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* Orange circle background */}
-      <circle cx="26" cy="26" r="26" fill="#F5A623" />
-      {/* White V shape */}
-      <path
-        d="M13 14 L26 38 L39 14"
-        stroke="white"
-        strokeWidth="5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-      />
-      {/* Inner grey triangle */}
-      <path
-        d="M19 14 L26 28 L33 14"
-        stroke="rgba(255,255,255,0.35)"
-        strokeWidth="3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-      />
-    </svg>
-  );
-}
+// function VAssureLogo() {
+//   return (
+//     <svg width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+//       {/* Orange circle background */}
+//       <circle cx="26" cy="26" r="26" fill="#F5A623" />
+//       {/* White V shape */}
+//       <path
+//         d="M13 14 L26 38 L39 14"
+//         stroke="white"
+//         strokeWidth="5"
+//         strokeLinecap="round"
+//         strokeLinejoin="round"
+//         fill="none"
+//       />
+//       {/* Inner grey triangle */}
+//       <path
+//         d="M19 14 L26 28 L33 14"
+//         stroke="rgba(255,255,255,0.35)"
+//         strokeWidth="3"
+//         strokeLinecap="round"
+//         strokeLinejoin="round"
+//         fill="none"
+//       />
+//     </svg>
+//   );
+// }
 
 export default function Login({ onLogin, error: externalError, loading: externalLoading }: LoginProps) {
   const [username, setUsername] = useState("");
@@ -115,7 +116,7 @@ export default function Login({ onLogin, error: externalError, loading: external
           {/* Logo + title */}
           <div style={{ textAlign: "center", marginBottom: "2rem" }}>
             <div style={{ display: "flex", justifyContent: "center", marginBottom: "1rem" }}>
-              <VAssureLogo />
+              <VAssureLogo size={72}/>
             </div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginBottom: 4 }}>
               <span style={{ fontSize: 22, fontWeight: 700, color: "hsl(var(--foreground))", letterSpacing: "-0.01em" }}>

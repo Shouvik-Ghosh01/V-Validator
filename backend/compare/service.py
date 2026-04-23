@@ -1,4 +1,4 @@
-from backend.compare.extractor_client import extract_client_pdf
+from backend.compare.extractor_client_basics import extract_client_pdf
 from backend.compare.extractor_executed import extract_executed_pdf
 from backend.compare.comparator import compare_scripts
 from typing import List, Dict, Any
@@ -46,7 +46,60 @@ def compare_pdfs(client_pdf_path: str, executed_pdf_path: str) -> Dict[str, Any]
                 "execution_steps": len(executed_script.execution_steps),
             }
         }
-        
+
+        # ─── Step data for PdfScreenshotsViewer ─────────────────────────
+        #
+        # Merge client + executed extraction into a single dict per step
+        # so the frontend popup shows all fields without extra API calls.
+        #
+        # executed_steps: keyed by step_number string
+        #   - procedure        → from client (extractor_client_basics)
+        #   - expected_results → from client (extractor_client_basics)
+        #   - actual_results   → from executed (extractor_executed)
+        #   - pass_fail        → from executed (extractor_executed)
+        #
+        # pts_steps: keyed by step_number string
+        #   - procedure        → from executed (extractor_executed) pre_test_setup
+        #     (setup instructions as actually recorded in the executed report)
+
+        # Build client lookup: procedure + expected_results
+        client_exec_lookup = {
+            s.step_number: s for s in client_script.execution_steps
+        }
+
+        # Merge execution steps
+        merged_exec: Dict[str, Dict[str, Any]] = {}
+        all_exec_nums = set(
+            s.step_number for s in client_script.execution_steps
+        ) | set(
+            s.step_number for s in executed_script.execution_steps
+        )
+
+        for num in all_exec_nums:
+            client_step = client_exec_lookup.get(num)
+            exec_step = next(
+                (s for s in executed_script.execution_steps if s.step_number == num),
+                None,
+            )
+            merged_exec[str(num)] = {
+                "step_number":      num,
+                "procedure":        client_step.procedure if client_step else (exec_step.procedure if exec_step else ""),
+                "expected_results": client_step.expected_results if client_step else (exec_step.expected_results if exec_step else ""),
+                "actual_results":   exec_step.actual_results if exec_step else "",
+                "pass_fail":        exec_step.pass_fail if exec_step else "",
+            }
+
+        comparison_result["executed_steps"] = merged_exec
+
+        # PTS steps — setup instructions from the executed report
+        comparison_result["pts_steps"] = {
+            str(s.step_number): {
+                "step_number": s.step_number,
+                "procedure":   s.procedure,
+            }
+            for s in executed_script.pre_test_setup
+        }
+
         return comparison_result
         
     except Exception as e:

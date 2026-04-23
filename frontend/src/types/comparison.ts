@@ -57,6 +57,19 @@ export interface ExecutionDifference {
   dynamic_data?: Record<string, string>;
 }
 
+interface ExecutedStepData {
+  step_number: number;
+  procedure: string;
+  expected_results: string;
+  actual_results: string;
+  pass_fail: string;
+}
+
+interface PtsStepData {
+  step_number: number;
+  procedure: string;
+}
+
 export interface ComparisonResult {
   has_differences: boolean;
   client_metadata: ClientMetadata;
@@ -65,4 +78,6 @@ export interface ComparisonResult {
   summary: Summary;
   setup_differences: Record<string, SetupDifference[]>;
   execution_differences: Record<string, ExecutionDifference[]>;
+  executed_steps: Record<string, ExecutedStepData>;
+  pts_steps: Record<string, PtsStepData>;
 }

@@ -4,6 +4,7 @@
 fastapi>=0.110.0
 uvicorn[standard]>=0.27.0
 pydantic>=2.6.0
+starlette>=0.37.0
 
 # -----------------------------
 # Frontend
@@ -17,12 +18,15 @@ requests>=2.31.0
 langchain>=0.2.0
 langchain-core>=0.2.0
 langchain-openai>=0.1.7
+langsmith>=0.1.0
+langgraph>=0.1.0
 
 # -----------------------------
 # LLM / OpenAI-compatible SDK
 # -----------------------------
 openai>=1.30.0
 groq>=0.9.0
+tiktoken>=0.7.0
 
 # -----------------------------
 # Vector Database
@@ -37,9 +41,16 @@ pandas>=2.2.0
 openpyxl>=3.1.2
 pypdf>=4.0.0
 pdfplumber>=0.11.0
+pdfminer.six>=20221105
+pypdfium2>=4.0.0
+pillow>=10.0.0
+lxml>=5.0.0
 
 # -----------------------------
 # Utilities
 # -----------------------------
 python-dotenv>=1.0.1
 tqdm>=4.66.0
+python-multipart>=0.0.9
+httpx>=0.27.0
+PyYAML>=6.0.0
