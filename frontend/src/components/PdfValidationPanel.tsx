@@ -8,6 +8,7 @@ import PdfSideBySideViewer from "./PdfSideBySideViewer";
 import PdfScreenshotsViewer from "./PdfScreenshotsViewer";
 import ValidationNotepad from "./ValidationNotepad";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { getStoredToken } from "./AuthContext";
 import type { ComparisonResult } from "@/types/comparison";
 
 const API_BASE = "";
@@ -26,7 +27,12 @@ export default function PdfValidationPanel() {
       const form = new FormData();
       form.append("client_pdf", clientPdf);
       form.append("output_pdf", outputPdf);
-      const res = await fetch(`${API_BASE}/compare`, { method: "POST", body: form });
+      const token = getStoredToken();
+      const res = await fetch(`${API_BASE}/compare`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      });
       if (!res.ok) throw new Error(`Server returned ${res.status}`);
       setResult(await res.json());
     } catch (err: unknown) {
@@ -159,11 +165,9 @@ export default function PdfValidationPanel() {
               <TabsContent value="screenshots">
                 <div className="glass-card overflow-hidden">
                   <PdfScreenshotsViewer
-                    clientPdf={clientPdf}
-                    outputPdf={outputPdf}
+                    clientPdf={clientPdf!}
+                    outputPdf={outputPdf!}
                     result={result}
-                    executedSteps={result?.executed_steps ?? {}}
-                    ptsSteps={result?.pts_steps ?? {}}
                   />
                 </div>
               </TabsContent>

@@ -1,76 +1,47 @@
 /**
- * Login.tsx
- * V-Assure styled login — username + password only, no captcha.
- * Uses the orange/white theme matching the V-Assure interface.
- *
- * Usage:
- *   import Login from "@/components/Login";
- *   <Login onLogin={(user, pass) => { ... }} />
+ * LoginPage.tsx
+ * Full V-Assure styled login with:
+ * - useAuth for JWT login
+ * - useNavigate for redirect after login
+ * - autoComplete off to prevent browser autofill
  */
 
 import { useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
-import { VAssureLogo } from "./VAssureLogo";
+import { useAuth } from "@/components/AuthContext";
+import { VAssureLogo } from "@/components/VAssureLogo";
 
-interface LoginProps {
-  onLogin: (username: string, password: string) => Promise<void> | void;
-  error?: string | null;
-  loading?: boolean;
-}
+export default function LoginPage() {
+  const { login } = useAuth();
+  const navigate = useNavigate();
 
-// V-Assure "V" logomark in SVG
-// function VAssureLogo() {
-//   return (
-//     <svg width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
-//       {/* Orange circle background */}
-//       <circle cx="26" cy="26" r="26" fill="#F5A623" />
-//       {/* White V shape */}
-//       <path
-//         d="M13 14 L26 38 L39 14"
-//         stroke="white"
-//         strokeWidth="5"
-//         strokeLinecap="round"
-//         strokeLinejoin="round"
-//         fill="none"
-//       />
-//       {/* Inner grey triangle */}
-//       <path
-//         d="M19 14 L26 28 L33 14"
-//         stroke="rgba(255,255,255,0.35)"
-//         strokeWidth="3"
-//         strokeLinecap="round"
-//         strokeLinejoin="round"
-//         fill="none"
-//       />
-//     </svg>
-//   );
-// }
-
-export default function Login({ onLogin, error: externalError, loading: externalLoading }: LoginProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
-  const [internalLoading, setInternalLoading] = useState(false);
-  const [internalError, setInternalError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
-
-  const loading = externalLoading ?? internalLoading;
-  const error = externalError ?? internalError;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
+
     if (!username.trim() || !password.trim()) {
-      setInternalError("Please enter your username and password.");
+      setError("Please enter your username and password.");
       return;
     }
-    setInternalError(null);
-    setInternalLoading(true);
+
+    setError(null);
+    setLoading(true);
+
     try {
-      await onLogin(username.trim(), password);
+      await login(username.trim(), password);
+      navigate("/dashboard", { replace: true });
     } catch (err: any) {
-      setInternalError(err?.message || "Login failed. Please check your credentials.");
+      setError(err?.message || "Login failed. Please check your credentials.");
     } finally {
-      setInternalLoading(false);
+      setLoading(false);
     }
   };
 
@@ -85,70 +56,123 @@ export default function Login({ onLogin, error: externalError, loading: external
     outline: "none",
     transition: "border-color 0.15s, box-shadow 0.15s",
     fontFamily: "inherit",
+    boxSizing: "border-box",
   };
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      background: "hsl(var(--background))",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      padding: "1.5rem",
-    }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "hsl(var(--background))",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "1.5rem",
+      }}
+    >
+      {/* Hidden dummy inputs to trick browser autofill away from real fields */}
+      <input type="text" style={{ display: "none" }} autoComplete="username" />
+      <input type="password" style={{ display: "none" }} autoComplete="current-password" />
+
       {/* Card */}
-      <div style={{
-        width: "100%",
-        maxWidth: 400,
-        background: "hsl(var(--card))",
-        border: "1px solid hsl(var(--border))",
-        borderRadius: 14,
-        boxShadow: "0 4px 24px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04)",
-        overflow: "hidden",
-      }}>
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 400,
+          background: "hsl(var(--card))",
+          border: "1px solid hsl(var(--border))",
+          borderRadius: 14,
+          boxShadow: "0 4px 24px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04)",
+          overflow: "hidden",
+        }}
+      >
         {/* Orange top bar */}
-        <div style={{
-          height: 5,
-          background: "linear-gradient(90deg, #F5A623 0%, #e8950f 100%)",
-        }} />
+        <div
+          style={{
+            height: 5,
+            background: "linear-gradient(90deg, #F5A623 0%, #e8950f 100%)",
+          }}
+        />
 
         <div style={{ padding: "2.5rem 2rem 2rem" }}>
           {/* Logo + title */}
           <div style={{ textAlign: "center", marginBottom: "2rem" }}>
-            <div style={{ display: "flex", justifyContent: "center", marginBottom: "1rem" }}>
-              <VAssureLogo size={72}/>
+            <div
+              style={{ display: "flex", justifyContent: "center", marginBottom: "1rem" }}
+            >
+              <VAssureLogo size={72} />
             </div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginBottom: 4 }}>
-              <span style={{ fontSize: 22, fontWeight: 700, color: "hsl(var(--foreground))", letterSpacing: "-0.01em" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6,
+                marginBottom: 4,
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 22,
+                  fontWeight: 700,
+                  color: "hsl(var(--foreground))",
+                  letterSpacing: "-0.01em",
+                }}
+              >
                 V-Assure
               </span>
-              <span style={{
-                fontSize: 11, fontWeight: 600, padding: "1px 7px", borderRadius: 20,
-                background: "rgba(245,166,35,0.12)", color: "#F5A623",
-                border: "1px solid rgba(245,166,35,0.3)", letterSpacing: "0.04em",
-              }}>
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  padding: "1px 7px",
+                  borderRadius: 20,
+                  background: "rgba(245,166,35,0.12)",
+                  color: "#F5A623",
+                  border: "1px solid rgba(245,166,35,0.3)",
+                  letterSpacing: "0.04em",
+                }}
+              >
                 Internal Tool
               </span>
             </div>
-            <p style={{ fontSize: 13, color: "hsl(var(--muted-foreground))", margin: 0 }}>
-              Validation & Comparison Platform
+            <p
+              style={{
+                fontSize: 13,
+                color: "hsl(var(--muted-foreground))",
+                margin: 0,
+              }}
+            >
+              Validation &amp; Comparison Platform
             </p>
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          <form
+            onSubmit={handleSubmit}
+            autoComplete="off"
+            style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
+          >
             {/* Username */}
             <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "hsl(var(--foreground))" }}>
+              <label
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: "hsl(var(--foreground))",
+                }}
+              >
                 Username
               </label>
               <input
                 type="text"
-                autoComplete="username"
+                autoComplete="off"
                 autoFocus
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && passwordRef.current?.focus()}
+                onKeyDown={(e) =>
+                  e.key === "Enter" && passwordRef.current?.focus()
+                }
                 placeholder="Enter your username"
                 style={inputStyle}
                 onFocus={(e) => {
@@ -164,21 +188,28 @@ export default function Login({ onLogin, error: externalError, loading: external
 
             {/* Password */}
             <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "hsl(var(--foreground))" }}>
+              <label
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: "hsl(var(--foreground))",
+                }}
+              >
                 Password
               </label>
               <div style={{ position: "relative" }}>
                 <input
                   ref={passwordRef}
                   type={showPass ? "text" : "password"}
-                  autoComplete="current-password"
+                  autoComplete="new-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
                   style={{ ...inputStyle, paddingRight: 44 }}
                   onFocus={(e) => {
                     e.target.style.borderColor = "#F5A623";
-                    e.target.style.boxShadow = "0 0 0 3px rgba(245,166,35,0.12)";
+                    e.target.style.boxShadow =
+                      "0 0 0 3px rgba(245,166,35,0.12)";
                   }}
                   onBlur={(e) => {
                     e.target.style.borderColor = "hsl(var(--border))";
@@ -188,12 +219,20 @@ export default function Login({ onLogin, error: externalError, loading: external
                 <button
                   type="button"
                   onClick={() => setShowPass((v) => !v)}
-                  style={{
-                    position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)",
-                    background: "none", border: "none", cursor: "pointer", padding: 2,
-                    color: "hsl(var(--muted-foreground))", display: "flex", alignItems: "center",
-                  }}
                   tabIndex={-1}
+                  style={{
+                    position: "absolute",
+                    right: 12,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    padding: 2,
+                    color: "hsl(var(--muted-foreground))",
+                    display: "flex",
+                    alignItems: "center",
+                  }}
                 >
                   {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -202,11 +241,16 @@ export default function Login({ onLogin, error: externalError, loading: external
 
             {/* Error */}
             {error && (
-              <div style={{
-                fontSize: 12, padding: "9px 12px", borderRadius: 7,
-                background: "rgba(239,68,68,0.07)", color: "#ef4444",
-                border: "1px solid rgba(239,68,68,0.2)",
-              }}>
+              <div
+                style={{
+                  fontSize: 12,
+                  padding: "9px 12px",
+                  borderRadius: 7,
+                  background: "rgba(239,68,68,0.07)",
+                  color: "#ef4444",
+                  border: "1px solid rgba(239,68,68,0.2)",
+                }}
+              >
                 {error}
               </div>
             )}
@@ -217,20 +261,37 @@ export default function Login({ onLogin, error: externalError, loading: external
               disabled={loading}
               style={{
                 marginTop: 4,
-                width: "100%", padding: "11px",
-                borderRadius: 8, border: "none",
+                width: "100%",
+                padding: "11px",
+                borderRadius: 8,
+                border: "none",
                 background: loading ? "rgba(245,166,35,0.5)" : "#F5A623",
-                color: "#fff", fontSize: 14, fontWeight: 700,
+                color: "#fff",
+                fontSize: 14,
+                fontWeight: 700,
                 cursor: loading ? "not-allowed" : "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
                 transition: "background 0.15s",
                 fontFamily: "inherit",
               }}
-              onMouseEnter={(e) => { if (!loading) (e.currentTarget.style.background = "#e8950f"); }}
-              onMouseLeave={(e) => { if (!loading) (e.currentTarget.style.background = "#F5A623"); }}
+              onMouseEnter={(e) => {
+                if (!loading) e.currentTarget.style.background = "#e8950f";
+              }}
+              onMouseLeave={(e) => {
+                if (!loading) e.currentTarget.style.background = "#F5A623";
+              }}
             >
               {loading ? (
-                <><Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> Signing in…</>
+                <>
+                  <Loader2
+                    size={16}
+                    style={{ animation: "spin 1s linear infinite" }}
+                  />
+                  Signing in…
+                </>
               ) : (
                 "Sign In"
               )}
@@ -239,21 +300,29 @@ export default function Login({ onLogin, error: externalError, loading: external
         </div>
 
         {/* Footer */}
-        <div style={{
-          padding: "12px 2rem",
-          borderTop: "1px solid hsl(var(--border))",
-          textAlign: "center",
-          fontSize: 11,
-          color: "hsl(var(--muted-foreground))",
-          background: "hsl(var(--muted))",
-        }}>
+        <div
+          style={{
+            padding: "12px 2rem",
+            borderTop: "1px solid hsl(var(--border))",
+            textAlign: "center",
+            fontSize: 11,
+            color: "hsl(var(--muted-foreground))",
+            background: "hsl(var(--muted))",
+          }}
+        >
           Copyright © Spotline Inc. · V-Assure Internal Platform
         </div>
       </div>
 
       <style>{`
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        input::placeholder { color: hsl(var(--muted-foreground)); opacity: 0.7; }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
+        }
+        input::placeholder {
+          color: hsl(var(--muted-foreground));
+          opacity: 0.7;
+        }
       `}</style>
     </div>
   );

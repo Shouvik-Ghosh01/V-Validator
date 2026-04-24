@@ -1,15 +1,9 @@
-import { useState } from "react";
-import LoginPage from "@/components/LoginPage";
+import { useAuth } from "@/components/AuthContext";
 import Dashboard from "@/pages/Dashboard";
 
 const Index = () => {
-  const [loggedIn, setLoggedIn] = useState(false);
-
-  if (!loggedIn) {
-    return <LoginPage onLogin={() => setLoggedIn(true)} />;
-  }
-
-  return <Dashboard onLogout={() => setLoggedIn(false)} />;
+  const { logout } = useAuth();
+  return <Dashboard onLogout={logout} />;
 };
 
 export default Index;
