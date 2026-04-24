@@ -55,14 +55,6 @@ export default function Dashboard({ onLogout }: DashboardProps) {
       {/* Main */}
       <main className="flex-1 overflow-auto p-6">
 
-        {/* Section Title */}
-        <div className="mb-6">
-          <h2 className="text-base font-semibold">PDF Comparison</h2>
-          <p className="text-xs text-muted-foreground">
-            Upload client and executed PDFs to validate and compare steps.
-          </p>
-        </div>
-
         {/* Card */}
         <div className="bg-card border border-border rounded-lg shadow-sm p-6">
           <PdfValidationPanel />

@@ -49,15 +49,15 @@ export default function PdfValidationPanel() {
         <div>
           <h2 className="text-xl font-bold text-foreground">PDF Validation</h2>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Client Test Script vs V-Assure Output — cosmetic & structural comparison
+            Template vs V-Assure Output Report — cosmetic & structural comparison
           </p>
         </div>
 
         {/* Upload */}
         <div className="glass-card p-6 space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <FileUploadZone label="Upload Client Test Script (PDF)" file={clientPdf} onFile={setClientPdf} />
-            <FileUploadZone label="Upload V-Assure Output (PDF)" file={outputPdf} onFile={setOutputPdf} />
+            <FileUploadZone label="Template (PDF)" file={clientPdf} onFile={setClientPdf} />
+            <FileUploadZone label="V-Assure Report (PDF)" file={outputPdf} onFile={setOutputPdf} />
           </div>
           {error && (
             <div className="flex items-start gap-3 diff-red rounded-md px-4 py-3 text-sm text-red-300">

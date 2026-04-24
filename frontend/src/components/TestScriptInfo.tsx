@@ -51,11 +51,11 @@ export default function TestScriptInfo({ clientMeta, executedMeta, statistics }:
       </h2>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Client Script */}
+        {/* Template */}
         <div className="glass-card p-5 space-y-4">
           <div className="flex items-center gap-2 pb-3 border-b border-border">
             <FileText className="w-4 h-4 text-muted-foreground" />
-            <h3 className="font-semibold text-foreground">Client Script</h3>
+            <h3 className="font-semibold text-foreground">Template</h3>
           </div>
           <div className="space-y-2.5">
             <InfoRow label="Script ID" value={clientMeta.script_id || "N/A"} highlight />
@@ -81,7 +81,7 @@ export default function TestScriptInfo({ clientMeta, executedMeta, statistics }:
         <div className="glass-card p-5 space-y-4">
           <div className="flex items-center gap-2 pb-3 border-b border-border">
             <CheckSquare className="w-4 h-4 text-green-400" />
-            <h3 className="font-semibold text-foreground">Executed Script (V-Assure)</h3>
+            <h3 className="font-semibold text-foreground">V-Assure Report</h3>
           </div>
           <div className="space-y-2.5">
             <InfoRow label="Script ID" value={executedMeta.script_id || "N/A"} highlight />
