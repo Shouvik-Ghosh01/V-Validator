@@ -4,11 +4,14 @@ import "./index.css";
 
 import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./components/AuthContext";
+import { ThemeProvider } from "./components/ThemeProvider";
 
 createRoot(document.getElementById("root")!).render(
   <BrowserRouter>
     <AuthProvider>
-      <App />
+      <ThemeProvider> {/* ✅ ADDED */}
+        <App />
+      </ThemeProvider>
     </AuthProvider>
   </BrowserRouter>
 );

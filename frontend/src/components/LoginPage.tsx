@@ -1,11 +1,3 @@
-/**
- * LoginPage.tsx
- * Full V-Assure styled login with:
- * - useAuth for JWT login
- * - useNavigate for redirect after login
- * - autoComplete off to prevent browser autofill
- */
-
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
@@ -39,200 +31,69 @@ export default function LoginPage() {
       await login(username.trim(), password);
       navigate("/dashboard", { replace: true });
     } catch (err: any) {
-      setError(err?.message || "Login failed. Please check your credentials.");
+      setError(err?.message || "Login failed.");
     } finally {
       setLoading(false);
     }
   };
 
-  const inputStyle: React.CSSProperties = {
-    width: "100%",
-    padding: "11px 14px",
-    borderRadius: 8,
-    border: "1px solid hsl(var(--border))",
-    background: "hsl(var(--card))",
-    color: "hsl(var(--foreground))",
-    fontSize: 14,
-    outline: "none",
-    transition: "border-color 0.15s, box-shadow 0.15s",
-    fontFamily: "inherit",
-    boxSizing: "border-box",
-  };
-
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "hsl(var(--background))",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "1.5rem",
-      }}
-    >
-      {/* Hidden dummy inputs to trick browser autofill away from real fields */}
-      <input type="text" style={{ display: "none" }} autoComplete="username" />
-      <input type="password" style={{ display: "none" }} autoComplete="current-password" />
+    <div className="min-h-screen flex items-center justify-center bg-background px-6">
+      <div className="w-full max-w-sm bg-card text-card-foreground border rounded-xl shadow-lg overflow-hidden">
 
-      {/* Card */}
-      <div
-        style={{
-          width: "100%",
-          maxWidth: 400,
-          background: "hsl(var(--card))",
-          border: "1px solid hsl(var(--border))",
-          borderRadius: 14,
-          boxShadow: "0 4px 24px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04)",
-          overflow: "hidden",
-        }}
-      >
-        {/* Orange top bar */}
-        <div
-          style={{
-            height: 5,
-            background: "linear-gradient(90deg, #F5A623 0%, #e8950f 100%)",
-          }}
-        />
+        {/* Top bar */}
+        <div className="h-[5px] bg-gradient-to-r from-[#F5A623] to-[#e8950f]" />
 
-        <div style={{ padding: "2.5rem 2rem 2rem" }}>
-          {/* Logo + title */}
-          <div style={{ textAlign: "center", marginBottom: "2rem" }}>
-            <div
-              style={{ display: "flex", justifyContent: "center", marginBottom: "1rem" }}
-            >
+        <div className="p-8">
+          {/* Logo */}
+          <div className="text-center mb-8">
+            <div className="flex justify-center mb-4">
               <VAssureLogo size={72} />
             </div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 6,
-                marginBottom: 4,
-              }}
-            >
-              <span
-                style={{
-                  fontSize: 22,
-                  fontWeight: 700,
-                  color: "hsl(var(--foreground))",
-                  letterSpacing: "-0.01em",
-                }}
-              >
-                V-Assure
-              </span>
-              <span
-                style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  padding: "1px 7px",
-                  borderRadius: 20,
-                  background: "rgba(245,166,35,0.12)",
-                  color: "#F5A623",
-                  border: "1px solid rgba(245,166,35,0.3)",
-                  letterSpacing: "0.04em",
-                }}
-              >
-                Internal Tool
+
+            <div className="flex justify-center items-center gap-2 mb-1">
+              <h1 className="text-xl font-bold">V-Assure</h1>
+              <span className="text-[10px] px-2 py-[2px] rounded-full border bg-primary/10 text-primary border-primary/30">
+                Internal
               </span>
             </div>
-            <p
-              style={{
-                fontSize: 13,
-                color: "hsl(var(--muted-foreground))",
-                margin: 0,
-              }}
-            >
-              Validation &amp; Comparison Platform
+
+            <p className="text-xs text-muted-foreground">
+              Validation & Comparison Platform
             </p>
           </div>
 
           {/* Form */}
-          <form
-            onSubmit={handleSubmit}
-            autoComplete="off"
-            style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
-          >
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+
             {/* Username */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-              <label
-                style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: "hsl(var(--foreground))",
-                }}
-              >
-                Username
-              </label>
+            <div>
+              <label className="text-xs font-semibold">Username</label>
               <input
-                type="text"
-                autoComplete="off"
-                autoFocus
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                onKeyDown={(e) =>
-                  e.key === "Enter" && passwordRef.current?.focus()
-                }
-                placeholder="Enter your username"
-                style={inputStyle}
-                onFocus={(e) => {
-                  e.target.style.borderColor = "#F5A623";
-                  e.target.style.boxShadow = "0 0 0 3px rgba(245,166,35,0.12)";
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = "hsl(var(--border))";
-                  e.target.style.boxShadow = "none";
-                }}
+                onKeyDown={(e) => e.key === "Enter" && passwordRef.current?.focus()}
+                placeholder="Enter username"
+                className="w-full mt-1 p-2 rounded-md border bg-input text-foreground focus:ring-2 focus:ring-primary outline-none"
               />
             </div>
 
             {/* Password */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-              <label
-                style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: "hsl(var(--foreground))",
-                }}
-              >
-                Password
-              </label>
-              <div style={{ position: "relative" }}>
+            <div>
+              <label className="text-xs font-semibold">Password</label>
+              <div className="relative">
                 <input
                   ref={passwordRef}
                   type={showPass ? "text" : "password"}
-                  autoComplete="new-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  style={{ ...inputStyle, paddingRight: 44 }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = "#F5A623";
-                    e.target.style.boxShadow =
-                      "0 0 0 3px rgba(245,166,35,0.12)";
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = "hsl(var(--border))";
-                    e.target.style.boxShadow = "none";
-                  }}
+                  placeholder="Enter password"
+                  className="w-full mt-1 p-2 pr-10 rounded-md border bg-input text-foreground focus:ring-2 focus:ring-primary outline-none"
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPass((v) => !v)}
-                  tabIndex={-1}
-                  style={{
-                    position: "absolute",
-                    right: 12,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    padding: 2,
-                    color: "hsl(var(--muted-foreground))",
-                    display: "flex",
-                    alignItems: "center",
-                  }}
+                  onClick={() => setShowPass(!showPass)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
                 >
                   {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -241,56 +102,21 @@ export default function LoginPage() {
 
             {/* Error */}
             {error && (
-              <div
-                style={{
-                  fontSize: 12,
-                  padding: "9px 12px",
-                  borderRadius: 7,
-                  background: "rgba(239,68,68,0.07)",
-                  color: "#ef4444",
-                  border: "1px solid rgba(239,68,68,0.2)",
-                }}
-              >
+              <div className="text-xs p-2 rounded bg-red-100 text-red-600 border border-red-300">
                 {error}
               </div>
             )}
 
-            {/* Submit */}
+            {/* Button */}
             <button
               type="submit"
               disabled={loading}
-              style={{
-                marginTop: 4,
-                width: "100%",
-                padding: "11px",
-                borderRadius: 8,
-                border: "none",
-                background: loading ? "rgba(245,166,35,0.5)" : "#F5A623",
-                color: "#fff",
-                fontSize: 14,
-                fontWeight: 700,
-                cursor: loading ? "not-allowed" : "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 8,
-                transition: "background 0.15s",
-                fontFamily: "inherit",
-              }}
-              onMouseEnter={(e) => {
-                if (!loading) e.currentTarget.style.background = "#e8950f";
-              }}
-              onMouseLeave={(e) => {
-                if (!loading) e.currentTarget.style.background = "#F5A623";
-              }}
+              className="bg-primary text-primary-foreground py-2 rounded-md font-semibold flex justify-center items-center gap-2 hover:opacity-90 transition"
             >
               {loading ? (
                 <>
-                  <Loader2
-                    size={16}
-                    style={{ animation: "spin 1s linear infinite" }}
-                  />
-                  Signing in…
+                  <Loader2 className="animate-spin" size={16} />
+                  Signing in...
                 </>
               ) : (
                 "Sign In"
@@ -300,30 +126,10 @@ export default function LoginPage() {
         </div>
 
         {/* Footer */}
-        <div
-          style={{
-            padding: "12px 2rem",
-            borderTop: "1px solid hsl(var(--border))",
-            textAlign: "center",
-            fontSize: 11,
-            color: "hsl(var(--muted-foreground))",
-            background: "hsl(var(--muted))",
-          }}
-        >
-          Copyright © Spotline Inc. · V-Assure Internal Platform
+        <div className="text-center text-xs p-3 border-t bg-muted text-muted-foreground">
+          © Spotline · V-Assure
         </div>
       </div>
-
-      <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to   { transform: rotate(360deg); }
-        }
-        input::placeholder {
-          color: hsl(var(--muted-foreground));
-          opacity: 0.7;
-        }
-      `}</style>
     </div>
   );
 }
