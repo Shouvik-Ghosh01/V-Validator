@@ -1,16 +1,15 @@
-# ----------------------
-# Python cache
-# ----------------------
+# Node
+node_modules/
+dist/
+
+# Python
 __pycache__/
 *.pyc
-*.pyo
-*.pyd
-
-# Virtual environment
 venv/
-.env
-.env.*
 
-# OS / Editor junk
+# Env
+.env
+
+# OS
 .DS_Store
-.vscode/
+Thumbs.db
