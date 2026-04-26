@@ -95,7 +95,6 @@ def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
     Returns a JWT access token on success.
     """
     users = get_users_collection()
-    # OAuth2PasswordRequestForm uses "username" field — we treat it as email
     user = users.find_one({"email": form_data.username.lower().strip(), "active": True})
 
     if not user or not verify_password(form_data.password, user["hashed_password"]):

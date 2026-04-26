@@ -11,11 +11,12 @@ from pymongo import MongoClient
 from pymongo.collection import Collection
 from passlib.context import CryptContext
 from dotenv import load_dotenv
+import certifi
 
 load_dotenv()
 
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
-DB_NAME   = os.getenv("DB_NAME", "vassure")
+MONGO_URI = os.getenv("MONGO_URI")
+DB_NAME   = os.getenv("DB_NAME")
 
 _client: MongoClient | None = None
 
@@ -25,7 +26,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 def get_db():
     global _client
     if _client is None:
-        _client = MongoClient(MONGO_URI)
+        _client = MongoClient(MONGO_URI, tlsCAFile=certifi.where())
     return _client[DB_NAME]
 
 
@@ -42,16 +43,10 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 
 def seed_admin_user():
-    """
-    Insert the default admin user on first run if no users exist.
-    Override via environment variables:
-      ADMIN_EMAIL    (default: admin@spotline.com)
-      ADMIN_PASSWORD (default: 1234)
-    """
     users = get_users_collection()
     if users.count_documents({}) == 0:
-        email    = os.getenv("ADMIN_EMAIL",    "admin@spotline.com")
-        password = os.getenv("ADMIN_PASSWORD", "1234")
+        email    = os.getenv("ADMIN_EMAIL")
+        password = os.getenv("ADMIN_PASSWORD")
         users.insert_one({
             "email":          email,
             "hashed_password": hash_password(password),

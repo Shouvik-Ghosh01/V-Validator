@@ -9,9 +9,6 @@ from pydantic import BaseModel
 from backend.auth import router as auth_router, get_current_user, UserInfo
 from backend.database import seed_admin_user
 from backend.compare.service import compare_pdfs
-from backend.agent.agent import run_agent
-from backend.safety.input_guard import is_query_allowed
-from backend.safety.prompt_guard import is_prompt_safe
 
 app = FastAPI(title="V-Assure Internal API")
 
@@ -84,20 +81,3 @@ async def compare(
             os.unlink(client_tmp)
         if output_tmp and os.path.exists(output_tmp):
             os.unlink(output_tmp)
-
-
-# ── /ask ──────────────────────────────────────────────────────────────────────
-class AskRequest(BaseModel):
-    query: str
-
-
-@app.post("/ask")
-def ask(
-    req: AskRequest,
-    current_user: Annotated[UserInfo, Depends(get_current_user)] = None,
-):
-    if not is_query_allowed(req.query):
-        return {"answer": "This query is outside the allowed scope.", "sources": []}
-    if is_prompt_safe(req.query):
-        return {"answer": "Query blocked due to unsafe intent.", "sources": []}
-    return run_agent(req.query)
