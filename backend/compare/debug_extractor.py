@@ -142,7 +142,7 @@ def extract_with_debug(pdf_path: str, is_executed: bool = False):
     print("=" * 70)
     
     if is_executed:
-        from backend.compare.extractor_executed import extract_executed_pdf
+        from compare.extractor_executed import extract_executed_pdf
         script = extract_executed_pdf(pdf_path)
         
         print(f"\n✓ Extraction complete:")
@@ -161,7 +161,7 @@ def extract_with_debug(pdf_path: str, is_executed: bool = False):
                 print(f"       Status: {step.pass_fail}")
     
     else:
-        from backend.compare.extractor_client import extract_client_pdf
+        from compare.extractor_client import extract_client_pdf
         script = extract_client_pdf(pdf_path)
         
         print(f"\n✓ Extraction complete:")

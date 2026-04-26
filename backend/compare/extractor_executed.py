@@ -1,12 +1,12 @@
 import pdfplumber
 import re
 from datetime import datetime
-from backend.compare.schemas import (
+from compare.schemas import (
     SetupStep,
     ExecutedExecutionStep,
     ExecutedScript,
 )
-from backend.compare.text_parsers import extract_pass_fail
+from compare.text_parsers import extract_pass_fail
 
 # =====================================================
 # PDF NOISE REMOVAL

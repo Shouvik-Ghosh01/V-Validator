@@ -33,12 +33,12 @@ main loop so a table that matches both heuristics is always treated as execution
 import re
 import pdfplumber
 
-from backend.compare.schemas import (
+from compare.schemas import (
     SetupStep,
     ClientExecutionStep,
     ClientScript,
 )
-from backend.compare.text_parsers import normalize_text
+from compare.text_parsers import normalize_text
 
 # ---------------------------------------------------------------------------
 # Constants
