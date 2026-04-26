@@ -1,41 +1,21 @@
 services:
   backend:
-    build: ./backend
+    image: v-validator-backend:latest
     ports:
       - "8000:8000"
-    volumes:
-      - ./backend:/app
-    environment:
-      - PYTHONPATH=/app
     env_file:
       - .env
-    depends_on:
-      - mongo
     networks:
       - v-assure-network
 
   frontend:
-    build: ./frontend
+    image: v-validator-frontend:latest
     ports:
-      - "8080:8080"
-    volumes:
-      - ./frontend:/app
+      - "80:8080"
     depends_on:
       - backend
     networks:
       - v-assure-network
-
-  mongo:
-    image: mongo:7
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo_data:/data/db
-    networks:
-      - v-assure-network
-
-volumes:
-  mongo_data:
 
 networks:
   v-assure-network:

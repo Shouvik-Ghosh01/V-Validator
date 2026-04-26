@@ -1,12 +1,13 @@
-FROM node:18-alpine
+FROM node:18
 
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm install --include=dev
+COPY package.json ./
+RUN NODE_ENV=development npm install && \
+    npm install @rollup/rollup-linux-arm64-gnu --save-optional
 
 COPY . .
 
 EXPOSE 8080
 
-CMD ["npm", "run", "dev"]
+CMD ["npx", "--yes", "vite", "--host", "0.0.0.0"]
