@@ -10,7 +10,8 @@
  * pressing Escape closes it.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { ComparisonResult } from "@/types/comparison";
 import * as pdfjsLib from "pdfjs-dist";
 import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist";
@@ -91,15 +92,17 @@ function rowsToLines(rows: TItem[][]): string {
 
 // ─── Screenshot detection ─────────────────────────────────────────────────────
 
-const PTS_RE  = /PTS\s+Step\s+#?(\d+)\s+Screenshot\s+#?(\d+)/i;
-const EXEC_RE = /Step\s+#?(\d+)\s+Screenshot(?:\s+#?(\d+))?/i;
+const PTS_RE  = /PTS\s+Step\s+#?(\d+)\s+Screenshot(?:\s+#?(\d+))?/i;
+const EXEC_RE = /(?:^|\s)Step\s+#?(\d+)\s+Screenshot(?:\s+#?(\d+))?/i;
 const TIME_RE = /Screenshot\s+Time:\s*([^\n\r]+)/i;
 
 function detectScreenshot(
   text: string
 ): { type: "pts" | "execution"; stepNum: number; screenshotNum: number } | null {
   const pts = PTS_RE.exec(text);
-  if (pts) return { type: "pts", stepNum: parseInt(pts[1]), screenshotNum: parseInt(pts[2]) };
+  if (pts) return { type: "pts", stepNum: parseInt(pts[1]), screenshotNum: pts[2] ? parseInt(pts[2]) : 1 };
+  if (/PTS\s+Step/i.test(text)) return null;
+
   const exec = EXEC_RE.exec(text);
   if (exec) return { type: "execution", stepNum: parseInt(exec[1]), screenshotNum: exec[2] ? parseInt(exec[2]) : 1 };
   return null;
@@ -199,6 +202,46 @@ function StepDetailPopup({ entry, btnRef, executedStep, ptsStep, onClose }: Popu
     ? { text: "#F5A623", bg: "rgba(245,166,35,0.12)", border: "rgba(245,166,35,0.35)" }
     : { text: "#22c55e", bg: "rgba(34,197,94,0.12)",  border: "rgba(34,197,94,0.35)"  };
 
+  const POPUP_W     = 340;
+  const POPUP_MAX_H = 480;
+  const GAP         = 8;
+  const EDGE_PAD    = 8;
+
+  // Start off-screen to avoid flash at (0,0) before position is computed
+  const [pos, setPos] = useState({ top: -9999, left: -9999 });
+
+  // Compute after mount — btnRef.current is guaranteed to be populated by then.
+  // Also recompute on scroll/resize so the popup tracks correctly when the page moves.
+  useLayoutEffect(() => {
+    function calcPos() {
+      const btn = btnRef.current;
+      if (!btn) return;
+      const r          = btn.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - r.bottom;
+      const spaceAbove = r.top;
+
+      let left = r.right - POPUP_W;
+      left = Math.max(EDGE_PAD, Math.min(left, window.innerWidth - POPUP_W - EDGE_PAD));
+
+      let top: number;
+      if (spaceBelow >= POPUP_MAX_H || spaceBelow >= spaceAbove) {
+        top = r.bottom + GAP;
+      } else {
+        top = r.top - POPUP_MAX_H - GAP;
+        if (top < EDGE_PAD) top = EDGE_PAD;
+      }
+      setPos({ top, left });
+    }
+
+    calcPos();
+    window.addEventListener("scroll", calcPos, { passive: true, capture: true });
+    window.addEventListener("resize", calcPos, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", calcPos, true);
+      window.removeEventListener("resize", calcPos);
+    };
+  }, [btnRef]);
+
   useEffect(() => {
     function onMouseDown(e: MouseEvent) {
       if (
@@ -210,7 +253,7 @@ function StepDetailPopup({ entry, btnRef, executedStep, ptsStep, onClose }: Popu
     }
     const t = setTimeout(() => document.addEventListener("mousedown", onMouseDown), 60);
     return () => { clearTimeout(t); document.removeEventListener("mousedown", onMouseDown); };
-  }, [onClose]);
+  }, [onClose, btnRef]);
 
   // Close on Escape
   useEffect(() => {
@@ -218,33 +261,6 @@ function StepDetailPopup({ entry, btnRef, executedStep, ptsStep, onClose }: Popu
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
-
-  const POPUP_W   = 340;
-  const POPUP_MAX_H = 480;
-  const GAP       = 8;
-
-  let fixedTop  = 0;
-  let fixedLeft = 0;
-
-  if (btnRef.current) {
-    const btnR = btnRef.current.getBoundingClientRect();
-
-    fixedLeft = Math.min(
-      btnR.right - POPUP_W,
-      window.innerWidth - POPUP_W - 8
-    );
-    if (fixedLeft < 8) fixedLeft = 8;
-
-    const spaceBelow = window.innerHeight - btnR.bottom;
-    const spaceAbove = btnR.top;
-
-    if (spaceBelow >= POPUP_MAX_H || spaceBelow >= spaceAbove) {
-      fixedTop = btnR.bottom + GAP;
-    } else {
-      fixedTop = btnR.top - POPUP_MAX_H - GAP;
-      if (fixedTop < 8) fixedTop = 8;
-    }
-  }
 
   // ── Reusable labelled field ──
   const Field = ({
@@ -278,28 +294,31 @@ function StepDetailPopup({ entry, btnRef, executedStep, ptsStep, onClose }: Popu
         padding: "9px 11px",
         whiteSpace: mono ? "pre-wrap" : "normal",
         wordBreak: "break-word",
-        maxHeight: 150,
-        overflowY: "auto",
       }}>
         {value ?? "Not available"}
       </div>
     </div>
   );
 
-  return (
+  // Don't render until position has been calculated (avoids flash at 0,0)
+  if (pos.top === -9999) return null;
+
+  const popupContent = (
     <div
       ref={popupRef}
       style={{
         position: "fixed",
-        top: fixedTop,
-        left: fixedLeft,
+        top: pos.top,
+        left: pos.left,
         width: POPUP_W,
-        zIndex: 9999,
+        zIndex: 99999,
         background: "hsl(var(--card))",
         border: `1px solid ${accent.border}`,
         borderRadius: 12,
-        boxShadow: "0 8px 32px rgba(0,0,0,0.28), 0 2px 8px rgba(0,0,0,0.16)",
-        overflow: "hidden",
+        boxShadow: "0 8px 40px rgba(0,0,0,0.35), 0 2px 12px rgba(0,0,0,0.2)",
+        display: "flex",
+        flexDirection: "column",
+        maxHeight: POPUP_MAX_H,
         animation: "ssPopupIn 0.15s ease-out",
       }}
     >
@@ -360,8 +379,6 @@ function StepDetailPopup({ entry, btnRef, executedStep, ptsStep, onClose }: Popu
             DIFF
           </span>
         )}
-
-
       </div>
 
       {/* Body */}
@@ -370,7 +387,8 @@ function StepDetailPopup({ entry, btnRef, executedStep, ptsStep, onClose }: Popu
         flexDirection: "column",
         gap: 12,
         padding: 14,
-        maxHeight: 460,
+        flex: 1,
+        minHeight: 0,
         overflowY: "auto",
       }}>
         {/* Screenshot time */}
@@ -462,6 +480,11 @@ function StepDetailPopup({ entry, btnRef, executedStep, ptsStep, onClose }: Popu
       </div>
     </div>
   );
+
+  // Portal to document.body — escapes ALL scroll containers, stacking contexts,
+  // overflow:hidden parents, and tab panel clipping. This is the only reliable
+  // way to position a fixed popup relative to a button deep inside a scroll tree.
+  return createPortal(popupContent, document.body);
 }
 
 // ─── Screenshot card ──────────────────────────────────────────────────────────
@@ -652,8 +675,8 @@ function ScreenshotCard({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 interface Props {
-  clientPdf: File;
-  outputPdf: File;
+  clientPdf: File | null;
+  outputPdf: File | null;
   result: ComparisonResult | null;
   /** Keyed by step_number string — from backend executed_steps */
   executedSteps?: Record<string, ExecutedStep>;
@@ -668,11 +691,12 @@ export default function PdfScreenshotsViewer({ clientPdf, outputPdf, result, exe
   const [filter,   setFilter]   = useState<"all" | "pts" | "execution">("all");
 
   useEffect(() => {
+    if (!outputPdf) return;   // guard: nothing to scan without the report PDF
     let cancelled = false;
     setEntries([]);
     setLoading(true);
 
-    extractScreenshots(outputPdf, result, (n, total) => {
+    extractScreenshots(outputPdf!, result, (n, total) => {
       if (!cancelled) setProgress({ n, total });
     })
       .then(es  => { if (!cancelled) { setEntries(es); setLoading(false); } })
@@ -690,6 +714,9 @@ export default function PdfScreenshotsViewer({ clientPdf, outputPdf, result, exe
 
       {/* ── Toolbar ── */}
       <div style={{
+        position: "sticky",
+        top: 0,
+        zIndex: 10,
         display: "flex",
         alignItems: "center",
         gap: 10,
@@ -783,8 +810,8 @@ export default function PdfScreenshotsViewer({ clientPdf, outputPdf, result, exe
             <ScreenshotCard
               key={`${entry.type}-${entry.stepNum}-${entry.screenshotNum}-${i}`}
               entry={entry}
-              executedStep={executedSteps[String(entry.stepNum)]}
-              ptsStep={ptsSteps[String(entry.stepNum)]}
+              executedStep={entry.type === "execution" ? executedSteps[String(entry.stepNum)] : undefined}
+              ptsStep={entry.type === "pts" ? ptsSteps[String(entry.stepNum)] : undefined}
             />
           ))
         )}

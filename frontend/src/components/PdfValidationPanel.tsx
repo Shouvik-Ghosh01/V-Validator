@@ -27,6 +27,7 @@ export default function PdfValidationPanel() {
       const form = new FormData();
       form.append("client_pdf", clientPdf);
       form.append("output_pdf", outputPdf);
+      // const res = await fetch(`${API_BASE}/compare`, { method: "POST", body: form });
       const token = getStoredToken();
       const res = await fetch(`${API_BASE}/compare`, {
         method: "POST",
@@ -49,15 +50,15 @@ export default function PdfValidationPanel() {
         <div>
           <h2 className="text-xl font-bold text-foreground">PDF Validation</h2>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Template vs V-Assure Output Report — cosmetic & structural comparison
+            Client Test Script vs V-Assure Output — cosmetic & structural comparison
           </p>
         </div>
 
         {/* Upload */}
         <div className="glass-card p-6 space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <FileUploadZone label="Template (PDF)" file={clientPdf} onFile={setClientPdf} />
-            <FileUploadZone label="V-Assure Report (PDF)" file={outputPdf} onFile={setOutputPdf} />
+            <FileUploadZone label="Upload Client Test Script (PDF)" file={clientPdf} onFile={setClientPdf} />
+            <FileUploadZone label="Upload V-Assure Output (PDF)" file={outputPdf} onFile={setOutputPdf} />
           </div>
           {error && (
             <div className="flex items-start gap-3 diff-red rounded-md px-4 py-3 text-sm text-red-300">
@@ -165,9 +166,11 @@ export default function PdfValidationPanel() {
               <TabsContent value="screenshots">
                 <div className="glass-card overflow-hidden">
                   <PdfScreenshotsViewer
-                    clientPdf={clientPdf!}
-                    outputPdf={outputPdf!}
+                    clientPdf={clientPdf}
+                    outputPdf={outputPdf}
                     result={result}
+                    executedSteps={result?.executed_steps ?? {}}
+                    ptsSteps={result?.pts_steps ?? {}}
                   />
                 </div>
               </TabsContent>
