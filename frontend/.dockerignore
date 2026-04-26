@@ -1,6 +1,12 @@
 node_modules
-package-lock.json
-.npm
 dist
 .env
+.env.*
+*.log
+npm-debug.log*
 bun.lockb
+package-lock.json
+.npm
+.git
+.gitignore
+README.md

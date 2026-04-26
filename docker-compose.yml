@@ -1,17 +1,29 @@
+version: "3.9"
+
 services:
   backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     image: v-validator-backend:latest
+    container_name: backend
+    restart: always
     ports:
       - "8000:8000"
     env_file:
-      - .env
+      - ./backend/.env        # .env sits inside the backend folder
     networks:
       - v-assure-network
 
   frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
     image: v-validator-frontend:latest
+    container_name: frontend
+    restart: always
     ports:
-      - "80:8080"
+      - "80:80"               # Nginx listens on 80, NOT 8080
     depends_on:
       - backend
     networks:
