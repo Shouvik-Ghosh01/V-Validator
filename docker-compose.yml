@@ -11,7 +11,7 @@ services:
     ports:
       - "8000:8000"
     env_file:
-      - ./backend/.env        # .env sits inside the backend folder
+      - ./backend/.env
     networks:
       - v-assure-network
 
@@ -23,7 +23,10 @@ services:
     container_name: frontend
     restart: always
     ports:
-      - "80:80"               # Nginx listens on 80, NOT 8080
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       - backend
     networks:
