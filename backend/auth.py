@@ -20,7 +20,7 @@ from jose import JWTError, jwt
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
-from backend.database import get_users_collection, verify_password
+from database import get_users_collection, verify_password
 
 load_dotenv()
 

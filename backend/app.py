@@ -6,9 +6,9 @@ from fastapi import FastAPI, UploadFile, File, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from backend.auth import router as auth_router, get_current_user, UserInfo
-from backend.database import seed_admin_user
-from backend.compare.service import compare_pdfs
+from auth import router as auth_router, get_current_user, UserInfo
+from database import seed_admin_user
+from compare.service import compare_pdfs
 
 app = FastAPI(title="V-Assure Internal API")
 
