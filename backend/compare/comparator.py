@@ -2,8 +2,8 @@ from typing import Dict, Any, List
 import logging
 import re
 
-from backend.compare.schemas import ClientScript, ExecutedScript
-from backend.compare.dynamic_rules import (
+from compare.schemas import ClientScript, ExecutedScript
+from compare.dynamic_rules import (
     allows_dynamic_suffix,
     extract_dynamic_values,
 )
