@@ -70,6 +70,22 @@ interface PtsStepData {
   procedure: string;
 }
 
+export interface GrammarError {
+  error_type: 'spelling' | 'duplicate_word' | 'punctuation' | 'tense_inconsistency' | 'sentence_fragment';
+  message: string;
+  context: string;
+  word: string;
+  suggestion: string;
+  source: 'client' | 'executed';
+  step_type: string;
+  step_number: number | null;
+}
+
+export interface GrammarErrors {
+  client: GrammarError[];
+  executed: GrammarError[];
+}
+
 export interface ComparisonResult {
   has_differences: boolean;
   client_metadata: ClientMetadata;
@@ -80,4 +96,5 @@ export interface ComparisonResult {
   execution_differences: Record<string, ExecutionDifference[]>;
   executed_steps: Record<string, ExecutedStepData>;
   pts_steps: Record<string, PtsStepData>;
+  grammar_errors?: GrammarErrors;
 }

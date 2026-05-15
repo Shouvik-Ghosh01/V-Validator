@@ -36,6 +36,24 @@ function isSignificantWord(w: string): boolean {
   return w.length >= 4 && !STOP_WORDS.has(w) && !/^\d+$/.test(w);
 }
 
+// ─── Collect grammar-error words from backend result ─────────────────────────
+// Only errors with a specific `word` (spelling, duplicate_word) map to PDF spans.
+
+function collectGrammarWords(result: ComparisonResult | null) {
+  const clientGrammar   = new Set<string>();
+  const executedGrammar = new Set<string>();
+  if (!result?.grammar_errors) return { clientGrammar, executedGrammar };
+
+  result.grammar_errors.client.forEach((e) => {
+    if (e.word) e.word.toLowerCase().split(/\W+/).filter((w) => w.length >= 2).forEach((w) => clientGrammar.add(w));
+  });
+  result.grammar_errors.executed.forEach((e) => {
+    if (e.word) e.word.toLowerCase().split(/\W+/).filter((w) => w.length >= 2).forEach((w) => executedGrammar.add(w));
+  });
+
+  return { clientGrammar, executedGrammar };
+}
+
 // ─── Collect meaningful diff words from backend result ────────────────────────
 
 function collectDiffWords(result: ComparisonResult | null) {
@@ -72,12 +90,13 @@ function collectDiffWords(result: ComparisonResult | null) {
 // ─── Single page renderer ─────────────────────────────────────────────────────
 
 function PdfPage({
-  page, scale, diffWords, highlightColor,
+  page, scale, diffWords, highlightColor, grammarWords,
 }: {
   page: PDFPageProxy;
   scale: number;
   diffWords: Set<string>;
   highlightColor: string;
+  grammarWords?: Set<string>;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
@@ -123,10 +142,20 @@ function PdfPage({
           line-height:1;
         `;
 
-        // Only highlight if the span contains a significant diff word
+        // Highlight diff words (red/green) — takes priority over grammar (blue)
         const spanWords = item.str.toLowerCase().split(/\W+/).filter(isSignificantWord);
-        if (spanWords.length > 0 && spanWords.some((w: string) => diffWords.has(w))) {
+        const isDiff    = spanWords.length > 0 && spanWords.some((w: string) => diffWords.has(w));
+
+        // For grammar words use a looser filter (length ≥ 2) so short misspellings are caught
+        const allSpanWords = item.str.toLowerCase().split(/\W+/).filter((w: string) => w.length >= 2);
+        const isGrammar    = !isDiff && grammarWords && grammarWords.size > 0
+          && allSpanWords.some((w: string) => grammarWords.has(w));
+
+        if (isDiff) {
           span.style.backgroundColor = highlightColor;
+          span.style.borderRadius = "2px";
+        } else if (isGrammar) {
+          span.style.backgroundColor = "rgba(59,130,246,0.5)";
           span.style.borderRadius = "2px";
         }
 
@@ -135,7 +164,7 @@ function PdfPage({
     });
 
     return () => { task.cancel?.(); };
-  }, [page, scale, diffWords, highlightColor]);
+  }, [page, scale, diffWords, highlightColor, grammarWords]);
 
   return (
     <div style={{
@@ -157,6 +186,7 @@ interface ColProps {
   diffWords: Set<string>;
   highlightColor: string;
   dotColor: string;
+  grammarWords?: Set<string>;
   // Sync props — only used when sync is ON
   syncEnabled: boolean;
   scrollTo?: number | null;       // external scroll position to apply
@@ -164,7 +194,7 @@ interface ColProps {
 }
 
 function PdfColumn({
-  label, file, scale, diffWords, highlightColor, dotColor,
+  label, file, scale, diffWords, highlightColor, dotColor, grammarWords,
   syncEnabled, scrollTo, onUserScroll,
 }: ColProps) {
   const [pages, setPages] = useState<PDFPageProxy[]>([]);
@@ -249,6 +279,7 @@ function PdfColumn({
               scale={scale}
               diffWords={diffWords}
               highlightColor={highlightColor}
+              grammarWords={grammarWords}
             />
           ))
         )}
@@ -277,7 +308,8 @@ export default function PdfSideBySideViewer({ clientPdf, outputPdf, result }: Pr
   const lastDriver = useRef<"left" | "right" | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const { clientWords, executedWords } = collectDiffWords(result);
+  const { clientWords, executedWords }         = collectDiffWords(result);
+  const { clientGrammar, executedGrammar }     = collectGrammarWords(result);
 
   const handleLeftScroll = useCallback((top: number) => {
     lastDriver.current = "left";
@@ -372,6 +404,7 @@ export default function PdfSideBySideViewer({ clientPdf, outputPdf, result }: Pr
           {[
             ["rgba(239,68,68,0.55)", "Removed (client)"],
             ["rgba(34,197,94,0.45)", "Added (executed)"],
+            ["rgba(59,130,246,0.5)",  "Grammar error"],
           ].map(([c, l]) => (
             <span key={l} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "hsl(var(--muted-foreground))" }}>
               <span style={{ width: 11, height: 11, borderRadius: 2, background: c }} />
@@ -394,6 +427,7 @@ export default function PdfSideBySideViewer({ clientPdf, outputPdf, result }: Pr
           diffWords={clientWords}
           highlightColor="rgba(239,68,68,0.5)"
           dotColor="#ef4444"
+          grammarWords={clientGrammar}
           syncEnabled={syncScroll}
           scrollTo={syncScroll && lastDriver.current === "right" ? leftScrollPos : null}
           onUserScroll={handleLeftScroll}
@@ -406,6 +440,7 @@ export default function PdfSideBySideViewer({ clientPdf, outputPdf, result }: Pr
           diffWords={executedWords}
           highlightColor="rgba(34,197,94,0.45)"
           dotColor="#22c55e"
+          grammarWords={executedGrammar}
           syncEnabled={syncScroll}
           scrollTo={syncScroll && lastDriver.current === "left" ? rightScrollPos : null}
           onUserScroll={handleRightScroll}

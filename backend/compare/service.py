@@ -1,6 +1,7 @@
 from compare.extractor_client_basics import extract_client_pdf
 from compare.extractor_executed import extract_executed_pdf
 from compare.comparator import compare_scripts
+from compare.grammar_checker import check_grammar
 from typing import List, Dict, Any
 import traceback
 
@@ -98,6 +99,39 @@ def compare_pdfs(client_pdf_path: str, executed_pdf_path: str) -> Dict[str, Any]
                 "procedure":   s.procedure,
             }
             for s in executed_script.pre_test_setup
+        }
+
+        # ─── Grammar checking ────────────────────────────────────────────────
+        grammar_client: List[Dict[str, Any]] = []
+        grammar_executed: List[Dict[str, Any]] = []
+
+        for step in client_script.setup_steps:
+            grammar_client.extend(
+                check_grammar(step.procedure, "client", "setup", step.step_number)
+            )
+        for step in client_script.execution_steps:
+            grammar_client.extend(
+                check_grammar(step.procedure, "client", "execution", step.step_number)
+            )
+            grammar_client.extend(
+                check_grammar(step.expected_results, "client", "execution", step.step_number)
+            )
+
+        for step in executed_script.pre_test_setup:
+            grammar_executed.extend(
+                check_grammar(step.procedure, "executed", "setup", step.step_number)
+            )
+        for step in executed_script.execution_steps:
+            grammar_executed.extend(
+                check_grammar(step.procedure, "executed", "execution", step.step_number)
+            )
+            grammar_executed.extend(
+                check_grammar(step.actual_results, "executed", "execution", step.step_number)
+            )
+
+        comparison_result["grammar_errors"] = {
+            "client": grammar_client,
+            "executed": grammar_executed,
         }
 
         return comparison_result

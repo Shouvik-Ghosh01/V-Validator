@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Loader2, AlertCircle, CheckCircle2, Zap, Wrench, Search, FileText, Camera } from "lucide-react";
+import { Loader2, AlertCircle, CheckCircle2, Zap, Wrench, Search, FileText, Camera, SpellCheck } from "lucide-react";
 import FileUploadZone from "./FileUploadZone";
 import TestScriptInfo from "./TestScriptInfo";
 import SetupStepCard from "./SetupStepCard";
 import ExecutionStepCard from "./ExecutionStepCard";
 import PdfSideBySideViewer from "./PdfSideBySideViewer";
 import PdfScreenshotsViewer from "./PdfScreenshotsViewer";
+import GrammarCheckerPanel from "./GrammarCheckerPanel";
 import ValidationNotepad from "./ValidationNotepad";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { getStoredToken } from "./AuthContext";
@@ -90,6 +91,19 @@ export default function PdfValidationPanel() {
                 <TabsTrigger value="screenshots" className="flex items-center gap-2">
                   <Camera className="w-3.5 h-3.5" /> Screenshots
                 </TabsTrigger>
+                <TabsTrigger value="grammar" className="flex items-center gap-2">
+                  <SpellCheck className="w-3.5 h-3.5" /> Grammar
+                  {(() => {
+                    const total =
+                      (result.grammar_errors?.client?.length ?? 0) +
+                      (result.grammar_errors?.executed?.length ?? 0);
+                    return total > 0 ? (
+                      <span className="ml-0.5 px-1.5 py-0.5 rounded-full text-xs font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                        {total}
+                      </span>
+                    ) : null;
+                  })()}
+                </TabsTrigger>
               </TabsList>
 
               {/* ── Analysis ── */}
@@ -173,6 +187,20 @@ export default function PdfValidationPanel() {
                     ptsSteps={result?.pts_steps ?? {}}
                   />
                 </div>
+              </TabsContent>
+
+              {/* ── Grammar ── */}
+              <TabsContent value="grammar" className="space-y-4">
+                <div>
+                  <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+                    <SpellCheck className="w-5 h-5 text-blue-400" /> Grammar Check
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    Spelling, duplicate words, punctuation, tense consistency, and sentence fragments detected in both scripts.
+                    <span className="ml-1 text-blue-400">Blue highlights</span> in the Side-by-Side PDF view mark grammar errors.
+                  </p>
+                </div>
+                <GrammarCheckerPanel result={result} />
               </TabsContent>
             </Tabs>
           </div>
