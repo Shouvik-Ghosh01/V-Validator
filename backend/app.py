@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from auth import router as auth_router, get_current_user, UserInfo
 from database import seed_admin_user
 from compare.service import compare_pdfs
+from freshdesk import router as freshdesk_router
 
 app = FastAPI(title="V-Assure Internal API")
 
@@ -33,6 +34,7 @@ def on_startup():
 
 # ── Auth routes ───────────────────────────────────────────────────────────────
 app.include_router(auth_router)
+app.include_router(freshdesk_router)
 
 
 # ── /compare ──────────────────────────────────────────────────────────────────

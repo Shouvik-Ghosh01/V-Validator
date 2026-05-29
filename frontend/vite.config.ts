@@ -18,7 +18,11 @@ export default defineConfig(({ mode }) => ({
       '/auth': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
-      }
+      },
+      '/freshdesk': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
     }
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),

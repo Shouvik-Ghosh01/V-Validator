@@ -12,8 +12,9 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import {
   ClipboardPaste, Upload, Trash2,
   Copy, FileText, Plus, X, Check, Image as ImageIcon, Minimize2,
-  ChevronDown, ChevronUp, Download,
+  ChevronDown, ChevronUp, Download, Ticket,
 } from "lucide-react";
+import FreshdeskExportModal from "./FreshdeskExportModal";
 
 type NoteTag = "text_incorrect" | "screenshot_incorrect" | "step_incorrect" | "other";
 
@@ -364,9 +365,11 @@ function getImageDimensions(dataUrl: string): Promise<{ w: number; h: number }> 
 function ExportDropdown({
   notes,
   scriptId,
+  onFreshdesk,
 }: {
   notes: NoteEntry[];
   scriptId: string;
+  onFreshdesk: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -407,6 +410,11 @@ function ExportDropdown({
       label: "Download as Text",
       icon: "🗒️",
       fn: () => run("txt", () => exportAsText(notes, scriptId)),
+    },
+    {
+      label: "Export to Freshdesk",
+      icon: "🎫",
+      fn: () => { setOpen(false); onFreshdesk(); },
     },
   ];
 
@@ -573,6 +581,7 @@ export default function ValidationNotepad({ scriptId = "Validation" }: { scriptI
   const [open, setOpen] = useState(false);
   const [notes, setNotes] = useState<NoteEntry[]>([]);
   const [allCopied, setAllCopied] = useState(false);
+  const [showFreshdesk, setShowFreshdesk] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── Resize state ──────────────────────────────────────────────────────────
@@ -777,7 +786,7 @@ export default function ValidationNotepad({ scriptId = "Validation" }: { scriptI
               </span>
             )}
             {/* ── Export dropdown sits in the header ── */}
-            <ExportDropdown notes={notes} scriptId={scriptId} />
+            <ExportDropdown notes={notes} scriptId={scriptId} onFreshdesk={() => setShowFreshdesk(true)} />
             <button onClick={() => setOpen(false)} style={{ padding: 4, background: "none", border: "none", cursor: "pointer", color: "hsl(var(--muted-foreground))", display: "flex" }}>
               <Minimize2 size={14} />
             </button>
@@ -824,6 +833,14 @@ export default function ValidationNotepad({ scriptId = "Validation" }: { scriptI
             )}
           </div>
         </div>
+      )}
+
+      {showFreshdesk && (
+        <FreshdeskExportModal
+          notes={notes}
+          scriptId={scriptId}
+          onClose={() => setShowFreshdesk(false)}
+        />
       )}
 
       <button
