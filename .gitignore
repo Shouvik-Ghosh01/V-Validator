@@ -1,14 +1,36 @@
 # Node
 node_modules/
 dist/
+build/
+coverage/
+npm-debug.log*
+*.tsbuildinfo
 
 # Python
 __pycache__/
 *.pyc
+*.pyo
 venv/
+.venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.coverage
+htmlcov/
 
 # Env
 .env
+.env.*
+!.env.example
+
+# Logs
+*.log
+
+# Editors
+.vscode/*
+.idea/
 
 # OS
 .DS_Store
